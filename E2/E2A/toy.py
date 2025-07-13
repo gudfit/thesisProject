@@ -1,3 +1,4 @@
+# E2/EA/toy.py
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -14,9 +15,6 @@ import os
 import bz2
 
 
-# ===================================================================
-# 1. SCALING LAW & MODEL DEFINITIONS (Unchanged)
-# ===================================================================
 def capacity_scaling_law(N, Q_max, a, gamma):
     return Q_max * (1 - a * np.power(N, -gamma))
 
@@ -45,9 +43,6 @@ class CifarCNN(nn.Module):
         return x
 
 
-# ===================================================================
-# 2. EXPERIMENT & ANALYSIS FUNCTIONS
-# ===================================================================
 def evaluate_model(model, testloader, device, noise_level=0.0):
     model.eval()
     correct, total = 0, 0
@@ -72,7 +67,6 @@ def run_experiment(base_model, testloader, config):
         if isinstance(module, (nn.Conv2d, nn.Linear))
     ]
 
-    # Calculate file size for each pruned model for later analysis
     pruned_model_paths = {}
     for n_budget in config["storage_budgets_N"]:
         model_to_prune = copy.deepcopy(base_model)
@@ -86,7 +80,6 @@ def run_experiment(base_model, testloader, config):
             for module, param_name in parameters_to_prune:
                 prune.remove(module, param_name)
 
-        # Save a temporary file to get its size
         temp_path = f"temp_model_{n_budget:.2f}.pt"
         torch.save(model_to_prune.state_dict(), temp_path)
         pruned_model_paths[n_budget] = (temp_path, os.path.getsize(temp_path))
@@ -107,7 +100,6 @@ def run_experiment(base_model, testloader, config):
                 }
             )
 
-    # Clean up temporary files
     for path, size in pruned_model_paths.values():
         os.remove(path)
 
@@ -115,11 +107,9 @@ def run_experiment(base_model, testloader, config):
 
 
 def analyze_and_plot(df_results, config):
-    # This function is now focused on the scaling laws
     print("\n" + "=" * 80)
     print("--- SCALING LAW ANALYSIS (CIFAR-10) ---")
     print("=" * 80)
-    # ... rest of the function is the same, ensures plots are generated ...
     theta_max = max(config["retrieval_budgets_theta"])
     df_analysis = df_results[df_results["theta_retrieval_budget"] == theta_max].copy()
     N_values = df_analysis["N_storage_budget"].values
@@ -153,7 +143,6 @@ def analyze_and_plot(df_results, config):
     except RuntimeError:
         delta_fit, popt_delta = float("nan"), [0.5, 0.5]
 
-    # ... Plotting logic ...
     fig, axs = plt.subplots(1, 2, figsize=(16, 6))
     axs[0].scatter(N_values, Q_values, label="Empirical Data", color="red", zorder=5)
     N_fine = np.linspace(min(N_values), max(N_values), 100)
@@ -192,20 +181,16 @@ def analyze_eir_and_master_plot(df_results, testset):
     print("--- EFFECTIVE INFORMATION RATIO & MASTER PLOT ---")
     print("=" * 80)
 
-    # Calculate Information Content of the dataset
     all_data_bytes = np.concatenate(testset.data).tobytes()
     bzip2_compressed_size_bytes = len(bz2.compress(all_data_bytes))
 
-    # Use performance at best retrieval budget
     theta_max = df_results["theta_retrieval_budget"].max()
     df_eir = df_results[df_results["theta_retrieval_budget"] == theta_max].copy()
 
-    # EIR = (Info_Content * Performance) / Storage_Cost
     df_eir["EIR"] = (bzip2_compressed_size_bytes * df_eir["performance_Q"]) / df_eir[
         "storage_cost_bytes"
     ]
 
-    # Sort by model size for a clean plot
     df_eir = df_eir.sort_values(by="N_storage_budget")
 
     print("\nCalculated EIR values:")
@@ -215,7 +200,6 @@ def analyze_eir_and_master_plot(df_results, testset):
         .round(4)
     )
 
-    # --- Generate the Master Plot ---
     peak_eir_row = df_eir.loc[df_eir["EIR"].idxmax()]
     peak_n = peak_eir_row["N_storage_budget"]
     peak_eir = peak_eir_row["EIR"]
@@ -259,9 +243,6 @@ def analyze_eir_and_master_plot(df_results, testset):
     plt.show()
 
 
-# ===================================================================
-# 5. MAIN EXECUTION
-# ===================================================================
 def main():
     config = {
         "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
@@ -270,7 +251,7 @@ def main():
         "storage_budgets_N": [1.0, 0.8, 0.6, 0.4, 0.2, 0.1, 0.05, 0.04],
         "retrieval_budgets_theta": [2.0, 5.0, 10.0, 25.0, 50.0, 75.0, 1000.0],
     }
-    output_csv_path = "cifar_pruning_results.csv"  # Define the output path
+    output_csv_path = "cifar_pruning_results.csv"
 
     transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
@@ -311,13 +292,11 @@ def main():
 
     model.load_state_dict(torch.load(model_path))
 
-    # --- Run Experiment and Save Results ---
     print("\n--- Starting Pruning Experiment ---")
     df_results = run_experiment(model, testloader, config)
     df_results.to_csv(output_csv_path, index=False)
     print(f"Experiment results saved to {output_csv_path}")
 
-    # --- Run ALL Analyses ---
     analyze_and_plot(df_results, config)
     analyze_eir_and_master_plot(df_results, testset)
 
