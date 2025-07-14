@@ -17,105 +17,91 @@ class PredictiveMaskingCompressor(BaseCompressor):
         self.mask_token_id = self.tokenizer.mask_token_id
 
     def compress(
-        self, text: str, masking_probability: float = 0.5, top_k: Optional[int] = None
+        self, text: str, masking_probability: float = 0.5, **kwargs
     ) -> Dict[str, any]:
         encoding = self.tokenizer(
             text, truncation=True, padding=False, return_tensors="pt", max_length=512
         )
-        input_ids = encoding["input_ids"][0]
-        attention_mask = encoding["attention_mask"][0]
-        masked_ids = input_ids.clone()
-        mask_positions: List[int] = []
-        special_tokens = {
-            self.tokenizer.cls_token_id,
-            self.tokenizer.sep_token_id,
-            self.tokenizer.pad_token_id,
-        }
-        for i, tok in enumerate(input_ids):
-            if (
-                tok.item() not in special_tokens
-                and random.random() < masking_probability
-            ):
-                masked_ids[i] = self.mask_token_id
-                mask_positions.append(i)
+        input_ids = encoding["input_ids"].squeeze() # FIX: Ensure 1D tensor
 
-        with torch.no_grad():
-            outputs = self.model(
-                input_ids=input_ids.unsqueeze(0).to(self.device),
-                attention_mask=attention_mask.unsqueeze(0).to(self.device),
-            )
-            logits = outputs.logits[0]
-            probs = torch.softmax(logits, dim=-1)
-            token_probs = probs[torch.arange(probs.size(0)), input_ids]
-        token_probs_np = token_probs.cpu().numpy()
-        sorted_idx = np.argsort(-token_probs_np)
-        if top_k is not None:
-            sorted_idx = sorted_idx[:top_k]
+        # Determine which tokens are eligible for masking
+        special_token_ids = self.tokenizer.all_special_ids
+        eligible_indices = [
+            i for i, token_id in enumerate(input_ids) if token_id not in special_token_ids
+        ]
+        
+        # Determine number of tokens to mask
+        num_to_mask = int(len(eligible_indices) * masking_probability)
+        
+        # Randomly select positions to mask from the eligible indices
+        mask_positions = sorted(random.sample(eligible_indices, num_to_mask))
+        
+        # To calculate the compressed data, we only need to store the unmasked tokens and their positions.
+        unmasked_indices = sorted(list(set(range(len(input_ids))) - set(mask_positions)))
+        unmasked_token_ids = input_ids[unmasked_indices].cpu().numpy()
 
         return {
-            "masked_ids": masked_ids.cpu().numpy(),
-            "mask_positions": np.array(mask_positions),
+            "unmasked_tokens": unmasked_token_ids.astype(np.uint16),
+            "unmasked_indices": np.array(unmasked_indices, dtype=np.uint16),
+            "mask_positions": np.array(mask_positions, dtype=np.uint16),
             "original_length": len(input_ids),
             "masking_probability": masking_probability,
-            "attention_mask": attention_mask.cpu().numpy(),
-            "token_probabilities": token_probs_np,
-            "most_predictable_positions": sorted_idx,
-            "most_predictable_scores": token_probs_np[sorted_idx],
         }
 
     def decompress(self, compressed_data: Dict[str, any]) -> str:
-        masked_ids = (
-            torch.tensor(compressed_data["masked_ids"]).unsqueeze(0).to(self.device)
-        )
-        attention_mask = (
-            torch.tensor(compressed_data["attention_mask"]).unsqueeze(0).to(self.device)
-        )
-        mask_positions = compressed_data["mask_positions"]
-        with torch.no_grad():
-            outputs = self.model(input_ids=masked_ids, attention_mask=attention_mask)
-            predictions = outputs.logits
-        reconstructed_ids = masked_ids.clone()
+        original_length = compressed_data["original_length"]
+        unmasked_tokens = compressed_data["unmasked_tokens"]
+        unmasked_indices = compressed_data["unmasked_indices"]
+        
+        # Reconstruct the initial masked sequence
+        decompress_ids = torch.full((original_length,), self.mask_token_id, dtype=torch.long)
+        decompress_ids[unmasked_indices] = torch.tensor(unmasked_tokens, dtype=torch.long)
+        
+        decompress_ids = decompress_ids.unsqueeze(0).to(self.device)
+        attention_mask = torch.ones_like(decompress_ids)
 
-        for pos in mask_positions:
-            predicted_id = predictions[0, pos].argmax().item()
-            reconstructed_ids[0, pos] = predicted_id
+        # Iteratively decompress
+        for _ in range(2): # 2 passes can help resolve dependencies
+            with torch.no_grad():
+                outputs = self.model(input_ids=decompress_ids, attention_mask=attention_mask)
+                predictions = outputs.logits
+            
+            # Find unresolved mask positions
+            mask_indices = (decompress_ids == self.mask_token_id).nonzero(as_tuple=False).squeeze()
+            if mask_indices.numel() == 0:
+                break # No more masks to fill
+
+            # Update predictions for masked positions
+            predicted_ids = predictions[0, mask_indices].argmax(dim=-1)
+            decompress_ids[0, mask_indices] = predicted_ids
+        
         reconstructed_text = self.tokenizer.decode(
-            reconstructed_ids[0], skip_special_tokens=True
+            decompress_ids.squeeze(), skip_special_tokens=True
         )
 
         return reconstructed_text
 
     def _calculate_compressed_size(self, compressed_data: Dict[str, any]) -> int:
-        masked_ids = compressed_data["masked_ids"]
-        mask_positions = compressed_data["mask_positions"]
-        original_length = compressed_data["original_length"]
-        num_unmasked = original_length - len(mask_positions)
-        unmasked_bits = num_unmasked * 32
-        if len(mask_positions) > 0:
-            position_bits = int(np.ceil(np.log2(original_length))) * len(mask_positions)
-        else:
-            position_bits = 0
+        unmasked_tokens = compressed_data["unmasked_tokens"]
+        unmasked_indices = compressed_data["unmasked_indices"]
+        
+        # Size of the unmasked tokens (assuming 16 bits per token for a vocab size up to 65536)
+        token_bits = len(unmasked_tokens) * 16
+        
+        # Size of the indices (assuming 16 bits for sequence length up to 65536)
+        index_bits = len(unmasked_indices) * 16
+        
+        # We also need to store the original length
+        metadata_bits = 16 
 
-        total_bits = unmasked_bits + position_bits
-        return total_bits
+        return token_bits + index_bits + metadata_bits
 
     def calculate_model_size(self) -> dict[str, float]:
         """
         Return a dictionary identical to the helpers in the other compressors.
-
-        Returns
-        -------
-        {
-            'disk_size_mb': <float>,      # model weights on disk
-            'param_count':  <int>         # total parameters
-        }
         """
-        # ---- count parameters ----
         param_count = sum(p.numel() for p in self.model.parameters())
-        # 4 bytes per fp32 parameter  ➜  convert to MB
         disk_size_mb = (param_count * 4) / (1024 ** 2)
-
-        # if you save any extra tables / codebooks, add them here
         extras_mb = 0.0
         return {
             "disk_size_mb": disk_size_mb + extras_mb,
@@ -139,42 +125,3 @@ class PredictiveMaskingCompressor(BaseCompressor):
             else:
                 high = mid
         return self.compress(text, masking_probability=best_prob)
-
-    def confidence_based_masking(
-        self, text: str, confidence_threshold: float = 0.9
-    ) -> Dict[str, any]:
-        encoding = self.tokenizer(
-            text, truncation=True, padding=False, return_tensors="pt", max_length=512
-        )
-        input_ids = encoding["input_ids"][0]
-        attention_mask = encoding["attention_mask"][0]
-        masked_ids = input_ids.clone()
-        mask_positions = []
-        for i in range(len(input_ids)):
-            if input_ids[i].item() in {
-                self.tokenizer.cls_token_id,
-                self.tokenizer.sep_token_id,
-            }:
-                continue
-            temp_masked = input_ids.clone()
-            temp_masked[i] = self.mask_token_id
-            with torch.no_grad():
-                outputs = self.model(
-                    input_ids=temp_masked.unsqueeze(0).to(self.device),
-                    attention_mask=attention_mask.unsqueeze(0).to(self.device),
-                )
-                probs = torch.softmax(outputs.logits[0, i], dim=-1)
-                confidence = probs[input_ids[i]].item()
-            if confidence >= confidence_threshold:
-                masked_ids[i] = self.mask_token_id
-                mask_positions.append(i)
-        compressed_data = {
-            "masked_ids": masked_ids.cpu().numpy(),
-            "mask_positions": np.array(mask_positions),
-            "original_length": len(input_ids),
-            "masking_probability": len(mask_positions) / len(input_ids),
-            "attention_mask": attention_mask.cpu().numpy(),
-            "confidence_threshold": confidence_threshold,
-        }
-
-        return compressed_data

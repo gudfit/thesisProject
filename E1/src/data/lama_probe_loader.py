@@ -1,6 +1,4 @@
-# src/data/lama_probe_loader.py
-"""Load factual probes from LAMA dataset or similar knowledge probe datasets."""
-
+# E1/src/data/lama_probe_loader.py
 import json
 import random
 import requests
@@ -56,7 +54,6 @@ class LAMAProbeLoader:
         probes = self._generate_t_rex_style_probes()
         with open(cache_file, "w") as f:
             json.dump(probes, f)
-
         random.shuffle(probes)
         return probes[:num_probes]
 
@@ -94,16 +91,12 @@ class LAMAProbeLoader:
             ("Scotland", "Edinburgh"),
             ("Wales", "Cardiff"),
         ]
-
         for country, capital in capitals:
-            probes.append(
-                {
-                    "prompt": f"The capital of {country} is [MASK]",
-                    "answer": capital,
-                    "relation": "P36",
-                }
-            )
-
+            probes.append({
+                "prompt": f"The capital of {country} is [MASK]",
+                "answer": capital,
+                "relation": "P36",
+            })
         languages = [
             ("France", "French"),
             ("Germany", "German"),
@@ -124,16 +117,12 @@ class LAMAProbeLoader:
             ("India", "Hindi"),
             ("Egypt", "Arabic"),
         ]
-
         for country, language in languages:
-            probes.append(
-                {
-                    "prompt": f"The official language of {country} is [MASK]",
-                    "answer": language,
-                    "relation": "P37",
-                }
-            )
-
+            probes.append({
+                "prompt": f"The official language of {country} is [MASK]",
+                "answer": language,
+                "relation": "P37",
+            })
         instance_relations = [
             ("Paris", "city"),
             ("Tokyo", "city"),
@@ -154,16 +143,12 @@ class LAMAProbeLoader:
             ("Python", "language"),
             ("Java", "language"),
         ]
-
         for instance, type_of in instance_relations:
-            probes.append(
-                {
-                    "prompt": f"{instance} is a [MASK]",
-                    "answer": type_of,
-                    "relation": "P31",
-                }
-            )
-
+            probes.append({
+                "prompt": f"{instance} is a [MASK]",
+                "answer": type_of,
+                "relation": "P31",
+            })
         locations = [
             ("Eiffel Tower", "Paris"),
             ("Statue of Liberty", "New York"),
@@ -180,16 +165,12 @@ class LAMAProbeLoader:
             ("Vatican", "Rome"),
             ("Brandenburg Gate", "Berlin"),
         ]
-
         for landmark, location in locations:
-            probes.append(
-                {
-                    "prompt": f"The {landmark} is located in [MASK]",
-                    "answer": location,
-                    "relation": "P276",
-                }
-            )
-
+            probes.append({
+                "prompt": f"The {landmark} is located in [MASK]",
+                "answer": location,
+                "relation": "P276",
+            })
         occupations = [
             ("Einstein", "physicist"),
             ("Darwin", "biologist"),
@@ -206,15 +187,12 @@ class LAMAProbeLoader:
             ("Plato", "philosopher"),
             ("Aristotle", "philosopher"),
         ]
-
         for person, occupation in occupations:
-            probes.append(
-                {
-                    "prompt": f"{person} was a [MASK]",
-                    "answer": occupation,
-                    "relation": "P106",
-                }
-            )
+            probes.append({
+                "prompt": f"{person} was a [MASK]",
+                "answer": occupation,
+                "relation": "P106",
+            })
         companies = [
             ("Microsoft", "Windows"),
             ("Apple", "iPhone"),
@@ -229,16 +207,12 @@ class LAMAProbeLoader:
             ("Samsung", "phones"),
             ("Sony", "PlayStation"),
         ]
-
         for company, product in companies:
-            probes.append(
-                {
-                    "prompt": f"{company} makes [MASK]",
-                    "answer": product,
-                    "relation": "P176",
-                }
-            )
-
+            probes.append({
+                "prompt": f"{company} makes [MASK]",
+                "answer": product,
+                "relation": "P176",
+            })
         return probes
 
     def load_conceptnet_probes(self, num_probes: int = 1000) -> List[Dict[str, str]]:
@@ -287,36 +261,24 @@ class LAMAProbeLoader:
             ("diamond", "expensive"),
             ("feather", "light"),
         ]
-
-        for item1, item2 in conceptnet_data[: len(conceptnet_data) // 3]:
-            probes.append(
-                {
-                    "prompt": f"A {item1} is a type of [MASK]",
-                    "answer": item2,
-                    "relation": "IsA",
-                }
-            )
-
-        for item1, item2 in conceptnet_data[
-            len(conceptnet_data) // 3 : 2 * len(conceptnet_data) // 3
-        ]:
-            probes.append(
-                {
-                    "prompt": f"A {item1} is part of a [MASK]",
-                    "answer": item2,
-                    "relation": "PartOf",
-                }
-            )
-
-        for item1, item2 in conceptnet_data[2 * len(conceptnet_data) // 3 :]:
-            probes.append(
-                {
-                    "prompt": f"A {item1} is [MASK]",
-                    "answer": item2,
-                    "relation": "HasProperty",
-                }
-            )
-
+        for item1, item2 in conceptnet_data[:len(conceptnet_data)//3]:
+            probes.append({
+                "prompt": f"A {item1} is a type of [MASK]",
+                "answer": item2,
+                "relation": "IsA",
+            })
+        for item1, item2 in conceptnet_data[len(conceptnet_data)//3:2*len(conceptnet_data)//3]:
+            probes.append({
+                "prompt": f"A {item1} is part of a [MASK]",
+                "answer": item2,
+                "relation": "PartOf",
+            })
+        for item1, item2 in conceptnet_data[2*len(conceptnet_data)//3:]:
+            probes.append({
+                "prompt": f"A {item1} is [MASK]",
+                "answer": item2,
+                "relation": "HasProperty",
+            })
         random.shuffle(probes)
         return probes[:num_probes]
 
@@ -334,16 +296,12 @@ class LAMAProbeLoader:
             ("NATO", "1949", "established in"),
             ("European Union", "1993", "formed in"),
         ]
-
         for event, year, context in historical:
-            probes.append(
-                {
-                    "prompt": f"{context} {event} in [MASK]",
-                    "answer": year,
-                    "relation": "temporal",
-                }
-            )
-
+            probes.append({
+                "prompt": f"{context} {event} in [MASK]",
+                "answer": year,
+                "relation": "temporal",
+            })
         scientific = [
             ("water", "H2O", "chemical formula"),
             ("salt", "NaCl", "chemical formula"),
@@ -355,7 +313,6 @@ class LAMAProbeLoader:
             ("penicillin", "Fleming", "discovered by"),
             ("radioactivity", "Curie", "studied by"),
         ]
-
         for concept, answer, context in scientific:
             if context == "chemical formula":
                 prompt = f"The {context} for {concept} is [MASK]"
@@ -363,11 +320,7 @@ class LAMAProbeLoader:
                 prompt = f"{concept.capitalize()} was {context} [MASK]"
             else:
                 prompt = f"{concept.capitalize()} {context} [MASK]"
-
-            probes.append(
-                {"prompt": prompt, "answer": answer, "relation": "scientific"}
-            )
-
+            probes.append({"prompt": prompt, "answer": answer, "relation": "scientific"})
         geographical = [
             ("Nile", "Africa", "longest river in"),
             ("Amazon", "South America", "largest river in"),
@@ -379,17 +332,12 @@ class LAMAProbeLoader:
             ("China", "population", "largest"),
             ("Tokyo", "city", "largest"),
         ]
-
         for feature, location, context in geographical:
             if context.endswith("in"):
                 prompt = f"The {feature} is the {context} [MASK]"
             else:
                 prompt = f"{feature} is the {context} [MASK]"
-
-            probes.append(
-                {"prompt": prompt, "answer": location, "relation": "geographical"}
-            )
-
+            probes.append({"prompt": prompt, "answer": location, "relation": "geographical"})
         random.shuffle(probes)
         return probes[:num_probes]
 
@@ -406,15 +354,12 @@ class LAMAProbeLoader:
         self, probes: List[Dict[str, str]], model_type: str
     ) -> List[Dict[str, str]]:
         filtered = []
-
         for probe in probes:
             prompt = probe["prompt"]
             answer = probe["answer"]
-
             if model_type in ["bert", "distilbert"]:
                 if len(answer.split()) == 1:
                     filtered.append(probe)
             else:
                 filtered.append(probe)
-
         return filtered
