@@ -17,4 +17,4 @@ training_args:
 experiment_name: "final_finetuned_llm_experiment"
 theta_budgets: [5, 10, 20, 40, 60, 100] 
 num_repetitions: 1 
-semantic_threshold: 0.90
+semantic_threshold: 0.95
