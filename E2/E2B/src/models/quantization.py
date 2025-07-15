@@ -31,12 +31,13 @@ class SparseGPTQuantizer:
         from datasets import load_dataset
         dataset = load_dataset(dataset_name, subset, split="train")
         samples = []
+        max_len = min(self.config.model_seqlen, tokenizer.model_max_length)
         for i in range(self.config.nsamples * 2):
             if len(samples) >= self.config.nsamples:
                 break
             txt = dataset[i]["text"]
             if txt.strip():
-                ids = tokenizer(txt, return_tensors="pt", truncation=True, max_length=self.config.model_seqlen, padding="max_length").input_ids
+                ids = tokenizer(txt, return_tensors="pt", truncation=True, max_length=max_len, padding="max_length").input_ids
                 if ids.shape[1] > 10:
                     samples.append(ids.to(self.device))
         return samples
@@ -61,7 +62,7 @@ class SparseGPTQuantizer:
     def _capture_activations(self, model, layers, samples):
         acts = {i: [] for i in range(len(layers))}
         hooks = []
-        for idx,l in enumerate(layers):
+        for idx, l in enumerate(layers):
             def save_inp(i):
                 def hook(mod, inp, out):
                     acts[i].append(inp[0].detach())
@@ -106,16 +107,21 @@ class SparseGPTQuantizer:
         w = w.view(out, -1, g)
         mn = w.min(dim=2, keepdim=True)[0]
         mx = w.max(dim=2, keepdim=True)[0]
-        scale = (mx - mn) / (2**b - 1)
+        scale = (mx - mn) / (2 ** b - 1)
         scale[scale == 0] = 1e-4
         zp = (-mn / scale).round()
-        qw = ((w - mn) / scale + zp).round().clamp(0, 2**b - 1)
+        qw = ((w - mn) / scale + zp).round().clamp(0, 2 ** b - 1)
         dq = (qw - zp) * scale + mn
         dq = dq.view(out, -1)[:, :inp]
         layer.weight.data = dq
 
     def quantize_model(self, model_path: str, output_path: str):
-        model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.float16 if self.config.use_cuda_fp16 else torch.float32).to(self.device)
+        model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            torch_dtype=torch.float16 if self.config.use_cuda_fp16 else torch.float32
+        ).to(self.device)
+        max_pos = getattr(model.config, "n_positions", getattr(model.config, "max_position_embeddings", 1024))
+        self.config.model_seqlen = min(self.config.model_seqlen, max_pos)
         tokenizer = AutoTokenizer.from_pretrained(model_path)
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
@@ -127,7 +133,7 @@ class SparseGPTQuantizer:
         Path(output_path).mkdir(parents=True, exist_ok=True)
         model.save_pretrained(output_path)
         tokenizer.save_pretrained(output_path)
-        with open(Path(output_path)/"quantization_config.json", "w") as f:
+        with open(Path(output_path) / "quantization_config.json", "w") as f:
             json.dump(self.config.__dict__, f, indent=2)
         del model
         gc.collect()

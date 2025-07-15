@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.utils.prune as prune
 from transformers import AutoModelForCausalLM
 import numpy as np
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict
 import logging
 from pathlib import Path
 from dataclasses import dataclass
@@ -20,6 +20,7 @@ class PruningConfig:
     iterative_steps: int = 1
     use_movement_pruning: bool = False
     movement_regularization: float = 0.001
+    block_size: int = 4
 
 class AdvancedPruner:
     def __init__(self, config: PruningConfig):
@@ -95,7 +96,7 @@ class AdvancedPruner:
             self.config.structured = True
             self.apply_magnitude_pruning(pruned_model, amount)
         elif self.config.method == "block_sparse":
-            self.apply_block_sparse_pruning(pruned_model, amount)
+            self.apply_block_sparse_pruning(pruned_model, amount, self.config.block_size)
         else:
             raise ValueError(f"Unknown pruning method: {self.config.method}")
         return pruned_model

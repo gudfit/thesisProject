@@ -23,6 +23,6 @@ pruned_models_dir: "./models/advanced_pruned"
 output_dir: "./results"
 
 theta_budgets: [5, 10, 20, 40, 100]
-num_repetitions: 3
+num_repetitions: 1
 semantic_threshold: 0.95
-max_samples: 500
+max_samples: 100

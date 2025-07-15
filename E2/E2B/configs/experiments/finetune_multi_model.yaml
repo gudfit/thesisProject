@@ -17,9 +17,8 @@ training_args:
   per_device_train_batch_size: 4
   logging_steps: 200
   save_strategy: "no"
-  evaluation_strategy: "no"
 
 theta_budgets: [5, 10, 20, 40, 60, 100]
-num_repetitions: 3
+num_repetitions: 1
 semantic_threshold: 0.95
-max_samples: 1000 
+max_samples: 100 

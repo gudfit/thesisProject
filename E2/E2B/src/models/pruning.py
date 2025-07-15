@@ -40,7 +40,7 @@ class ModelPruner:
     @staticmethod
     def create_pruned_models(
         base_model_path: str, output_dir: str, pruning_amounts: List[float]
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         logger.info(f"Creating pruned models from {base_model_path}")
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         base_model = AutoModelForCausalLM.from_pretrained(base_model_path)

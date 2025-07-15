@@ -13,14 +13,17 @@ quantization_configs:
     bits: 4
     sparsity: 0.3
     group_size: 128
+    model_seqlen: 1024
   - method: "sparsegpt"
     bits: 4
     sparsity: 0.5
     group_size: 128
+    model_seqlen: 1024
   - method: "sparsegpt"
     bits: 8
     sparsity: 0.5
     group_size: 128
+    model_seqlen: 1024
 
 finetuned_models_dir: "./models/finetuned"
 quantized_models_dir: "./models/quantized"
@@ -29,4 +32,4 @@ output_dir: "./results"
 theta_budgets: [5, 10, 20, 40, 100]
 num_repetitions: 3
 semantic_threshold: 0.95
-max_samples: 500
+max_samples: 100
