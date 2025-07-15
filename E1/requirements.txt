@@ -21,3 +21,4 @@ python-Levenshtein>=0.21.0
 accelerate
 evaluate>=0.4.0
 zstandard>=0.21.0
+bitsandbytes
