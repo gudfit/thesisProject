@@ -55,6 +55,7 @@ visualization:
   save_figures: true
 
 experiment_1b:
+  fine_tune_epochs: 10
   corpus_size: 5000
   test_size: 500
   factual_probes: 1000

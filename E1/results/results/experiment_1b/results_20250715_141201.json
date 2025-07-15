@@ -1,0 +1,145 @@
+{
+  "bert-base-uncased": {
+    "llm": {
+      "size": {
+        "total_parameters": 109514298,
+        "disk_size_mb": 417.7638931274414
+      },
+      "factual_recall": 0.11931818181818182,
+      "reasoning_capability": 0.555,
+      "perplexity": 6.292313924314985,
+      "inference_cost": {
+        "avg_inference_time_ms": 5.780916213989258,
+        "model_parameters": 109514298
+      },
+      "data_efficiency": {
+        "efficiency_curve": [
+          {
+            "data_size": 10,
+            "performance": 0.529
+          },
+          {
+            "data_size": 50,
+            "performance": 0.564
+          },
+          {
+            "data_size": 100,
+            "performance": 0.742
+          },
+          {
+            "data_size": 500,
+            "performance": 0.853
+          }
+        ]
+      }
+    },
+    "gzip": {
+      "size": {
+        "original_size_mb": 1.33685302734375,
+        "compressed_size_mb": 0.4778175354003906,
+        "compression_ratio": 2.797831658110924
+      }
+    },
+    "comparison": {
+      "size_ratio": 874.3167886824689
+    }
+  },
+  "roberta-base": {
+    "llm": {
+      "size": {
+        "total_parameters": 124697433,
+        "disk_size_mb": 475.68295669555664
+      },
+      "factual_recall": 0.0,
+      "reasoning_capability": 0.389,
+      "perplexity": 4.935459240938882,
+      "inference_cost": {
+        "avg_inference_time_ms": 5.9041643142700195,
+        "model_parameters": 124697433
+      },
+      "data_efficiency": {
+        "efficiency_curve": [
+          {
+            "data_size": 10,
+            "performance": 0.45
+          },
+          {
+            "data_size": 50,
+            "performance": 0.557
+          },
+          {
+            "data_size": 100,
+            "performance": 0.742
+          },
+          {
+            "data_size": 500,
+            "performance": 0.84
+          },
+          {
+            "data_size": 1000,
+            "performance": 0.881
+          }
+        ]
+      }
+    },
+    "gzip": {
+      "size": {
+        "original_size_mb": 1.33685302734375,
+        "compressed_size_mb": 0.4778175354003906,
+        "compression_ratio": 2.797831658110924
+      }
+    },
+    "comparison": {
+      "size_ratio": 995.5326488739153
+    }
+  },
+  "distilbert-base-uncased": {
+    "llm": {
+      "size": {
+        "total_parameters": 66985530,
+        "disk_size_mb": 255.5295181274414
+      },
+      "factual_recall": 0.06818181818181818,
+      "reasoning_capability": 0.409,
+      "perplexity": 7.990329302884849,
+      "inference_cost": {
+        "avg_inference_time_ms": 2.970266342163086,
+        "model_parameters": 66985530
+      },
+      "data_efficiency": {
+        "efficiency_curve": [
+          {
+            "data_size": 10,
+            "performance": 0.463
+          },
+          {
+            "data_size": 50,
+            "performance": 0.647
+          },
+          {
+            "data_size": 100,
+            "performance": 0.686
+          },
+          {
+            "data_size": 500,
+            "performance": 0.843
+          },
+          {
+            "data_size": 1000,
+            "performance": 0.871
+          }
+        ]
+      }
+    },
+    "gzip": {
+      "size": {
+        "original_size_mb": 1.33685302734375,
+        "compressed_size_mb": 0.4778175354003906,
+        "compression_ratio": 2.797831658110924
+      }
+    },
+    "comparison": {
+      "size_ratio": 534.7847226103132
+    }
+  }
+}
