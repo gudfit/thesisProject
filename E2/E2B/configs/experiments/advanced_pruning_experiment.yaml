@@ -1,0 +1,28 @@
+experiment_name: "advanced_pruning_comparison"
+dataset_name: "wikitext"
+dataset_subset: "wikitext-2-raw-v1"
+test_split: "validation"
+
+base_models:
+  - {name: "GPT2-small", model_id: "gpt2"}
+  - {name: "GPT2-medium", model_id: "gpt2-medium"}
+
+pruning_configs:
+  - method: "magnitude"
+    structured: false
+    amounts: [0.2, 0.4, 0.6]
+  - method: "structured"
+    structured: true
+    amounts: [0.2, 0.4, 0.6]
+  - method: "block_sparse"
+    block_size: 4
+    amounts: [0.2, 0.4, 0.6]
+
+finetuned_models_dir: "./models/finetuned"
+pruned_models_dir: "./models/advanced_pruned"
+output_dir: "./results"
+
+theta_budgets: [5, 10, 20, 40, 100]
+num_repetitions: 1
+semantic_threshold: 0.95
+max_samples: 100

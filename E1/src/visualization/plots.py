@@ -34,28 +34,34 @@ class CompressionVisualizer:
             ("semantic_similarity", "Semantic Similarity"),
             ("rouge1_fmeasure", "ROUGE-1 F1 Score"),
         ]
+        
+        # Determine shared x-axis label
+        x_label = "Hyperparameter (Masking Prob / Bits / Codebook Size)"
+        
         for idx, (metric_key, metric_label) in enumerate(metrics_to_plot):
             ax = axes[idx]
             for model_name, model_results in results.items():
-                masking_probs = []
+                hyperparams = []
                 metric_values = []
-                for prob, metrics in model_results.items():
-                    if isinstance(prob, float):
-                        masking_probs.append(prob)
+                for param, metrics in model_results.items():
+                    if isinstance(param, (float, int)):
+                        hyperparams.append(param)
                         metric_values.append(metrics.get(metric_key, 0))
-                sorted_data = sorted(zip(masking_probs, metric_values))
-                masking_probs, metric_values = zip(*sorted_data)
-                ax.plot(
-                    masking_probs,
-                    metric_values,
-                    marker="o",
-                    label=model_name,
-                    linewidth=2,
-                )
+                
+                if hyperparams:
+                    sorted_data = sorted(zip(hyperparams, metric_values))
+                    hyperparams, metric_values = zip(*sorted_data)
+                    ax.plot(
+                        hyperparams,
+                        metric_values,
+                        marker="o",
+                        label=model_name,
+                        linewidth=2,
+                    )
 
-            ax.set_xlabel("Masking Probability", fontsize=12)
+            ax.set_xlabel(x_label, fontsize=12)
             ax.set_ylabel(metric_label, fontsize=12)
-            ax.set_title(f"{metric_label} vs Masking Probability", fontsize=14)
+            ax.set_title(f"{metric_label} vs. Hyperparameter", fontsize=14)
             ax.legend()
             ax.grid(True, alpha=0.3)
 
@@ -69,68 +75,82 @@ class CompressionVisualizer:
     ):
         data_frames = []
         for model_name, model_results in results.items():
-            for prob, metrics in model_results.items():
-                if isinstance(prob, float):
-                    data_frames.append(
-                        {
-                            "Model": model_name,
-                            "Masking Probability": prob,
-                            "Compression Ratio": metrics.get("compression_ratio", 0),
-                            "Word Accuracy": metrics.get("word_accuracy", 0),
-                            "Semantic Similarity": metrics.get(
-                                "semantic_similarity", 0
-                            ),
-                            "ROUGE-1 F1": metrics.get("rouge1_fmeasure", 0),
-                            "BERT Score F1": metrics.get("bert_score_f1", 0),
-                        }
-                    )
+            for param, metrics in model_results.items():
+                if isinstance(param, (float, int)):
+                    record = {
+                        "Model": model_name,
+                        "Hyperparameter": param,
+                        "Compression Ratio": metrics.get("compression_ratio", 0),
+                        "Word Accuracy": metrics.get("word_accuracy", 0),
+                        "Semantic Similarity": metrics.get(
+                            "semantic_similarity", 0
+                        ),
+                        "ROUGE-1 F1": metrics.get("rouge1_fmeasure", 0),
+                        "BERT Score F1": metrics.get("bert_score_f1", 0),
+                    }
+                    if 'lsq' in model_name.lower():
+                        record['Parameter Type'] = 'Quantization Bits'
+                    elif 'vq' in model_name.lower():
+                        record['Parameter Type'] = 'Codebook Size'
+                    else:
+                        record['Parameter Type'] = 'Masking Probability'
+                    data_frames.append(record)
+
+        if not data_frames:
+            print("No data for interactive plot.")
+            return
 
         df = pd.DataFrame(data_frames)
-        fig = make_subplots(
-            rows=2,
-            cols=2,
-            subplot_titles=(
-                "Compression Ratio",
-                "Word Accuracy",
-                "Semantic Similarity",
-                "ROUGE-1 F1",
-            ),
-        )
+        fig = px.line(df, x="Hyperparameter", y="Semantic Similarity", color="Model",
+                      facet_col="Parameter Type", markers=True,
+                      title="Interactive Compression Performance Comparison")
+        fig.update_xaxes(matches=None) # Unlink x-axes
+        fig.write_html(f"{self.figure_dir}/{save_name}.html")
+        
+    def plot_efficiency_vs_fidelity_tradeoff(
+        self,
+        results: Dict[str, Dict],
+        fidelity_metric: str = "semantic_similarity",
+        efficiency_metric: str = "bits_per_character",
+        save_name: str = "efficiency_fidelity_tradeoff",
+    ):
+        plt.figure(figsize=(12, 8))
+        
+        for model_name, model_results in results.items():
+            efficiency_values = []
+            fidelity_values = []
+            
+            for param, metrics in model_results.items():
+                if isinstance(param, (float, int)):
+                    efficiency_values.append(metrics.get(efficiency_metric, 0))
+                    fidelity_values.append(metrics.get(fidelity_metric, 0))
 
-        metrics = [
-            "Compression Ratio",
-            "Word Accuracy",
-            "Semantic Similarity",
-            "ROUGE-1 F1",
-        ]
-        positions = [(1, 1), (1, 2), (2, 1), (2, 2)]
-
-        for metric, (row, col) in zip(metrics, positions):
-            for model in df["Model"].unique():
-                model_data = df[df["Model"] == model].sort_values("Masking Probability")
-
-                fig.add_trace(
-                    go.Scatter(
-                        x=model_data["Masking Probability"],
-                        y=model_data[metric],
-                        mode="lines+markers",
-                        name=f"{model}",
-                        showlegend=(row == 1 and col == 1),
-                        line=dict(width=2),
-                        marker=dict(size=8),
-                    ),
-                    row=row,
-                    col=col,
+            if efficiency_values and fidelity_values:
+                # Sort by efficiency for a clean line plot
+                sorted_data = sorted(zip(efficiency_values, fidelity_values))
+                efficiency_values, fidelity_values = zip(*sorted_data)
+                
+                plt.plot(
+                    efficiency_values,
+                    fidelity_values,
+                    marker="o",
+                    linestyle="--",
+                    label=model_name,
+                    linewidth=2,
+                    markersize=8,
+                    alpha=0.8
                 )
 
-        fig.update_xaxes(title_text="Masking Probability")
-        fig.update_layout(
-            title_text="Interactive Compression Performance Comparison",
-            height=800,
-            hovermode="x unified",
-        )
-
-        fig.write_html(f"{self.figure_dir}/{save_name}.html")
+        plt.xlabel(efficiency_metric.replace("_", " ").title() + " (Lower is Better)", fontsize=12)
+        plt.ylabel(fidelity_metric.replace("_", " ").title() + " (Higher is Better)", fontsize=12)
+        plt.title(f"{fidelity_metric.replace('_', ' ').title()} vs. {efficiency_metric.replace('_', ' ').title()}", fontsize=16)
+        plt.legend(title="Model & Method")
+        plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+        plt.gca().invert_xaxis() # Lower bits/char is better, so plot from right to left
+        
+        plt.tight_layout()
+        plt.savefig(f"{self.figure_dir}/{save_name}.png", dpi=300, bbox_inches="tight")
+        plt.close()
 
     def plot_heatmap_comparison(
         self,
@@ -139,19 +159,25 @@ class CompressionVisualizer:
         save_name: str = "heatmap_comparison",
     ):
         models = list(results.keys())
-        masking_probs = sorted(
-            [p for p in results[models[0]].keys() if isinstance(p, float)]
-        )
+        # This will need to be smarter if params are different types
+        try:
+            hyperparams = sorted(
+                list(set(p for model in results.values() for p in model if isinstance(p, (float, int))))
+            )
+        except (IndexError, KeyError):
+            print("Could not generate heatmap, result structure may be inconsistent.")
+            return
 
-        matrix = np.zeros((len(models), len(masking_probs)))
+        matrix = np.zeros((len(models), len(hyperparams)))
 
         for i, model in enumerate(models):
-            for j, prob in enumerate(masking_probs):
-                matrix[i, j] = results[model][prob].get(metric, 0)
+            for j, param in enumerate(hyperparams):
+                matrix[i, j] = results.get(model, {}).get(param, {}).get(metric, 0)
+
         plt.figure(figsize=(12, 8))
         sns.heatmap(
             matrix,
-            xticklabels=[f"{p:.1f}" for p in masking_probs],
+            xticklabels=[f"{p:.2f}" for p in hyperparams],
             yticklabels=models,
             annot=True,
             fmt=".3f",
@@ -159,8 +185,8 @@ class CompressionVisualizer:
             cbar_kws={"label": metric.replace("_", " ").title()},
         )
 
-        plt.xlabel("Masking Probability", fontsize=12)
-        plt.ylabel("Model", fontsize=12)
+        plt.xlabel("Hyperparameter Value", fontsize=12)
+        plt.ylabel("Model & Method", fontsize=12)
         plt.title(f'{metric.replace("_", " ").title()} Heatmap', fontsize=14)
 
         plt.tight_layout()
@@ -172,26 +198,32 @@ class CompressionVisualizer:
     ):
         plt.figure(figsize=(12, 8))
         for model_name, model_results in results.items():
-            masking_probs = []
+            hyperparams = []
             bpt_values = []
-            for prob, metrics in model_results.items():
-                if isinstance(prob, float):
-                    masking_probs.append(prob)
-                    bpt_values.append(metrics.get("bits_per_character", 0) * 4)
-            sorted_data = sorted(zip(masking_probs, bpt_values))
-            masking_probs, bpt_values = zip(*sorted_data)
+            for param, metrics in model_results.items():
+                if isinstance(param, (float, int)):
+                    hyperparams.append(param)
+                    # Approximate BPT from BPC, assuming avg 5 chars/token
+                    bpt_values.append(metrics.get("bits_per_character", 0) * 5)
+            
+            if hyperparams:
+                sorted_data = sorted(zip(hyperparams, bpt_values))
+                hyperparams, bpt_values = zip(*sorted_data)
 
-            plt.plot(
-                masking_probs, bpt_values, marker="o", label=model_name, linewidth=2
-            )
+                plt.plot(
+                    hyperparams, bpt_values, marker="o", label=model_name, linewidth=2
+                )
 
-        plt.xlabel("Masking Probability", fontsize=12)
-        plt.ylabel("Bits Per Token", fontsize=12)
+        plt.xlabel("Hyperparameter Value", fontsize=12)
+        plt.ylabel("Approx. Bits Per Token", fontsize=12)
         plt.title("Compression Efficiency: Bits Per Token", fontsize=14)
         plt.legend()
         plt.grid(True, alpha=0.3)
         plt.axhline(
-            y=32, color="red", linestyle="--", alpha=0.5, label="Uncompressed (32 bits)"
+            y=32, color="red", linestyle="--", alpha=0.5, label="Uncompressed Token (FP32 ID)"
+        )
+        plt.axhline(
+            y=8, color="green", linestyle="--", alpha=0.5, label="Gzip-like BPT"
         )
 
         plt.tight_layout()
@@ -201,7 +233,7 @@ class CompressionVisualizer:
     def plot_model_comparison_radar(
         self,
         results: Dict[str, Dict],
-        masking_prob: float = 0.5,
+        hyperparameter_val: float = 0.5,
         save_name: str = "radar_comparison",
     ):
         metrics = [
@@ -222,24 +254,30 @@ class CompressionVisualizer:
         fig = go.Figure()
 
         for model_name, model_results in results.items():
-            if masking_prob in model_results:
+            # Find the closest hyperparameter
+            valid_keys = [k for k in model_results.keys() if isinstance(k, (int, float))]
+            if not valid_keys: continue
+            closest_param = min(valid_keys, key=lambda x:abs(x-hyperparameter_val))
+            
+            if closest_param in model_results:
                 values = []
                 for metric in metrics:
-                    value = model_results[masking_prob].get(metric, 0)
+                    value = model_results[closest_param].get(metric, 0)
                     if metric == "compression_ratio":
+                        # Normalize compression ratio for plotting: 0=1x, 1=10x or more
                         value = min(value / 10, 1.0)
                     values.append(value)
 
                 fig.add_trace(
                     go.Scatterpolar(
-                        r=values, theta=metric_labels, fill="toself", name=model_name
+                        r=values, theta=metric_labels, fill="toself", name=f"{model_name} (param~{closest_param:.2f})"
                     )
                 )
 
         fig.update_layout(
-            polar=dict(radialaxis=dict(visible=True, range=[0, 1])),
+            polar=dict(radialaxis=dict(visible=True, range=[0,1])),
             showlegend=True,
-            title=f"Model Comparison at {masking_prob:.0%} Masking Probability",
+            title=f"Model Comparison at Hyperparameter ~{hyperparameter_val}",
         )
 
         fig.write_html(f"{self.figure_dir}/{save_name}.html")
@@ -247,6 +285,7 @@ class CompressionVisualizer:
     def plot_reconstruction_examples(
         self, examples: List[Dict[str, str]], save_name: str = "reconstruction_examples"
     ):
+        if not examples: return
         fig, axes = plt.subplots(len(examples), 1, figsize=(14, 4 * len(examples)))
         if len(examples) == 1:
             axes = [axes]
@@ -255,10 +294,6 @@ class CompressionVisualizer:
             original = example["original"]
             reconstructed = example["reconstructed"]
 
-            original_words = original.split()
-            reconstructed_words = reconstructed.split()
-
-            # Create colored text visualization
             ax.text(0.02, 0.9, "Original:", transform=ax.transAxes, fontweight="bold")
             ax.text(0.02, 0.7, original, transform=ax.transAxes, wrap=True, fontsize=10)
 
@@ -272,7 +307,7 @@ class CompressionVisualizer:
             ax.text(
                 0.02,
                 0.1,
-                f"Model: {example['model']} | Masking: {example['masking_prob']:.0%}",
+                f"Model: {example['model']} | Param: {example['param']}",
                 transform=ax.transAxes,
                 fontsize=9,
                 style="italic",
@@ -290,6 +325,7 @@ class CompressionVisualizer:
     def create_summary_report(
         self, results: Dict[str, Dict], save_name: str = "summary_report"
     ):
+        if not results: return
         self.plot_compression_vs_accuracy(results, f"{save_name}_accuracy")
         self.plot_interactive_comparison(results, f"{save_name}_interactive")
         self.plot_heatmap_comparison(
@@ -299,27 +335,33 @@ class CompressionVisualizer:
             results, "compression_ratio", f"{save_name}_heatmap_compression"
         )
         self.plot_bits_per_token_analysis(results, f"{save_name}_bits_per_token")
+        self.plot_efficiency_vs_fidelity_tradeoff(results, save_name=f"{save_name}_tradeoff")
         self._create_summary_table(results, f"{save_name}_table")
 
     def _create_summary_table(self, results: Dict[str, Dict], save_name: str):
         summary_data = []
         for model_name, model_results in results.items():
-            for prob, metrics in model_results.items():
-                if isinstance(prob, float):
-                    summary_data.append(
-                        {
-                            "Model": model_name,
-                            "Masking Prob": prob,
-                            "Compression Ratio": f"{metrics.get('compression_ratio', 0):.2f}",
-                            "Word Accuracy": f"{metrics.get('word_accuracy', 0):.3f}",
-                            "Semantic Similarity": f"{metrics.get('semantic_similarity', 0):.3f}",
-                            "ROUGE-1 F1": f"{metrics.get('rouge1_fmeasure', 0):.3f}",
-                            "BERT Score F1": f"{metrics.get('bert_score_f1', 0):.3f}",
-                        }
-                    )
+            for param, metrics in model_results.items():
+                if isinstance(param, (float, int)):
+                    row = {
+                        "Model & Method": model_name,
+                        "Hyperparameter": f"{param:.2f}",
+                        "Compression Ratio": f"{metrics.get('compression_ratio', 0):.2f}",
+                        "Word Accuracy": f"{metrics.get('word_accuracy', 0):.3f}",
+                        "Semantic Similarity": f"{metrics.get('semantic_similarity', 0):.3f}",
+                        "ROUGE-1 F1": f"{metrics.get('rouge1_fmeasure', 0):.3f}",
+                        "BERT Score F1": f"{metrics.get('bert_score_f1', 0):.3f}",
+                        "Bits/Char": f"{metrics.get('bits_per_character', 0):.3f}"
+                    }
+                    if 'lsq' in model_name.lower():
+                        row['Hyperparameter'] = str(metrics.get('quantization_bits'))
+                    elif 'vq' in model_name.lower():
+                        row['Hyperparameter'] = str(param)
+                    summary_data.append(row)
+        if not summary_data: return
 
         df = pd.DataFrame(summary_data)
-        fig, ax = plt.subplots(figsize=(14, len(summary_data) * 0.5 + 2))
+        fig, ax = plt.subplots(figsize=(16, len(summary_data) * 0.4 + 2))
         ax.axis("tight")
         ax.axis("off")
         table = ax.table(
@@ -335,3 +377,4 @@ class CompressionVisualizer:
         plt.title("Compression Experiment Results Summary", fontsize=16, pad=20)
         plt.savefig(f"{self.figure_dir}/{save_name}.png", dpi=300, bbox_inches="tight")
         plt.close()
+

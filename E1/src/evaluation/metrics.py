@@ -1,8 +1,9 @@
+# E1/src/evaluation/metrics.py
 """Evaluation metrics for compression quality."""
 
 import torch
 import numpy as np
-from typing import Dict, List, Tuple, Optional
+from typing import Dict
 from rouge_score import rouge_scorer
 from bert_score import score as bert_score
 from transformers import AutoTokenizer, AutoModel
@@ -16,6 +17,7 @@ for res in ("punkt", "punkt_tab"):
         nltk.data.find(f"tokenizers/{res}")
     except LookupError:
         nltk.download(res, quiet=True)
+
 
 class CompressionMetrics:
     def __init__(self, device: str = "cuda"):
@@ -39,87 +41,81 @@ class CompressionMetrics:
         original_text: str,
         reconstructed_text: str,
         compressed_data: Dict[str, any],
+        compressor,
     ) -> Dict[str, float]:
-        metrics = {}
-        metrics["exact_match"] = float(
-            original_text.strip() == reconstructed_text.strip()
-        )
-        metrics["character_accuracy"] = self.character_accuracy(
+        m: Dict[str, float] = {}
+        m["exact_match"] = float(original_text.strip() == reconstructed_text.strip())
+        m["character_accuracy"] = self.character_accuracy(
             original_text, reconstructed_text
         )
-        metrics["word_accuracy"] = self.word_accuracy(original_text, reconstructed_text)
-        metrics["levenshtein_distance"] = self.levenshtein_distance(
+        m["word_accuracy"] = self.word_accuracy(original_text, reconstructed_text)
+        m["levenshtein_distance"] = self.levenshtein_distance(
             original_text, reconstructed_text
         )
-        rouge_scores = self.rouge_scores(original_text, reconstructed_text)
-        metrics.update(rouge_scores)
-        metrics["bleu_score"] = self.bleu_score(original_text, reconstructed_text)
-        bert_scores = self.bert_score(original_text, reconstructed_text)
-        metrics.update(bert_scores)
-        metrics["semantic_similarity"] = self.semantic_similarity(
+        m.update(self.rouge_scores(original_text, reconstructed_text))
+        m["bleu_score"] = self.bleu_score(original_text, reconstructed_text)
+        m.update(self.bert_score(original_text, reconstructed_text))
+        m["semantic_similarity"] = self.semantic_similarity(
             original_text, reconstructed_text
         )
-        metrics["compression_ratio"] = self.compression_ratio(
-            original_text, compressed_data
+        m["compression_ratio"] = self.compression_ratio(
+            original_text, compressed_data, compressor
         )
-        metrics["bits_per_character"] = self.bits_per_character(
-            original_text, compressed_data
+        m["bits_per_character"] = self.bits_per_character(
+            original_text, compressed_data, compressor
         )
-        return metrics
+        return m
 
-    def character_accuracy(self, original: str, reconstructed: str) -> float:
-        if len(original) == 0:
-            return 1.0 if len(reconstructed) == 0 else 0.0
-
+    @staticmethod
+    def character_accuracy(original: str, reconstructed: str) -> float:
+        if not original:
+            return 1.0 if not reconstructed else 0.0
         matches = sum(1 for o, r in zip(original, reconstructed) if o == r)
         return matches / max(len(original), len(reconstructed))
 
-    def word_accuracy(self, original: str, reconstructed: str) -> float:
-        original_words = original.split()
-        reconstructed_words = reconstructed.split()
-        if len(original_words) == 0:
-            return 1.0 if len(reconstructed_words) == 0 else 0.0
-        matches = sum(1 for o, r in zip(original_words, reconstructed_words) if o == r)
-        return matches / max(len(original_words), len(reconstructed_words))
+    @staticmethod
+    def word_accuracy(original: str, reconstructed: str) -> float:
+        ow, rw = original.split(), reconstructed.split()
+        if not ow:
+            return 1.0 if not rw else 0.0
+        return 1 - Levenshtein.distance(" ".join(ow), " ".join(rw)) / max(len(ow), 1)
 
-    def levenshtein_distance(self, original: str, reconstructed: str) -> float:
-        if len(original) == 0 and len(reconstructed) == 0:
+    @staticmethod
+    def levenshtein_distance(original: str, reconstructed: str) -> float:
+        if not original and not reconstructed:
             return 0.0
-        distance = Levenshtein.distance(original, reconstructed)
-        return distance / max(len(original), len(reconstructed))
-
-    def rouge_scores(self, original: str, reconstructed: str) -> Dict[str, float]:
-        scores = self.rouge_scorer.score(original, reconstructed)
-
-        return {
-            "rouge1_precision": scores["rouge1"].precision,
-            "rouge1_recall": scores["rouge1"].recall,
-            "rouge1_fmeasure": scores["rouge1"].fmeasure,
-            "rouge2_precision": scores["rouge2"].precision,
-            "rouge2_recall": scores["rouge2"].recall,
-            "rouge2_fmeasure": scores["rouge2"].fmeasure,
-            "rougeL_precision": scores["rougeL"].precision,
-            "rougeL_recall": scores["rougeL"].recall,
-            "rougeL_fmeasure": scores["rougeL"].fmeasure,
-        }
-
-    def bleu_score(self, original: str, reconstructed: str) -> float:
-        original_tokens = nltk.word_tokenize(original.lower())
-        reconstructed_tokens = nltk.word_tokenize(reconstructed.lower())
-        if len(original_tokens) == 0:
-            return 1.0 if len(reconstructed_tokens) == 0 else 0.0
-        smoothie = SmoothingFunction().method4
-        score = sentence_bleu(
-            [original_tokens], reconstructed_tokens, smoothing_function=smoothie
+        return Levenshtein.distance(original, reconstructed) / max(
+            len(original), len(reconstructed)
         )
 
-        return score
+    def rouge_scores(self, original: str, reconstructed: str) -> Dict[str, float]:
+        s = self.rouge_scorer.score(original, reconstructed)
+        return {
+            "rouge1_precision": s["rouge1"].precision,
+            "rouge1_recall": s["rouge1"].recall,
+            "rouge1_fmeasure": s["rouge1"].fmeasure,
+            "rouge2_precision": s["rouge2"].precision,
+            "rouge2_recall": s["rouge2"].recall,
+            "rouge2_fmeasure": s["rouge2"].fmeasure,
+            "rougeL_precision": s["rougeL"].precision,
+            "rougeL_recall": s["rougeL"].recall,
+            "rougeL_fmeasure": s["rougeL"].fmeasure,
+        }
+
+    @staticmethod
+    def bleu_score(original: str, reconstructed: str) -> float:
+        o_tokens = nltk.word_tokenize(original.lower())
+        r_tokens = nltk.word_tokenize(reconstructed.lower())
+        if not o_tokens:
+            return 1.0 if not r_tokens else 0.0
+        return sentence_bleu(
+            [o_tokens], r_tokens, smoothing_function=SmoothingFunction().method4
+        )
 
     def bert_score(self, original: str, reconstructed: str) -> Dict[str, float]:
         P, R, F1 = bert_score(
             [reconstructed], [original], lang="en", device=self.device, verbose=False
         )
-
         return {
             "bert_score_precision": P.mean().item(),
             "bert_score_recall": R.mean().item(),
@@ -128,91 +124,56 @@ class CompressionMetrics:
 
     def semantic_similarity(self, original: str, reconstructed: str) -> float:
         with torch.no_grad():
-            orig_encoding = self.semantic_tokenizer(
+            o_enc = self.semantic_tokenizer(
                 original,
-                padding=True,
-                truncation=True,
                 return_tensors="pt",
+                truncation=True,
+                padding=True,
                 max_length=512,
             ).to(self.device)
-
-            orig_outputs = self.semantic_model(**orig_encoding)
-            orig_embedding = self._mean_pooling(
-                orig_outputs, orig_encoding["attention_mask"]
-            )
-
-            # Reconstructed text
-            recon_encoding = self.semantic_tokenizer(
+            r_enc = self.semantic_tokenizer(
                 reconstructed,
-                padding=True,
-                truncation=True,
                 return_tensors="pt",
+                truncation=True,
+                padding=True,
                 max_length=512,
             ).to(self.device)
-
-            recon_outputs = self.semantic_model(**recon_encoding)
-            recon_embedding = self._mean_pooling(
-                recon_outputs, recon_encoding["attention_mask"]
+            o_emb = self._mean_pool(
+                self.semantic_model(**o_enc), o_enc["attention_mask"]
             )
-        similarity = cosine_similarity(
-            orig_embedding.cpu().numpy(), recon_embedding.cpu().numpy()
-        )[0, 0]
+            r_emb = self._mean_pool(
+                self.semantic_model(**r_enc), r_enc["attention_mask"]
+            )
+        return float(cosine_similarity(o_emb.cpu().numpy(), r_emb.cpu().numpy())[0, 0])
 
-        return float(similarity)
+    @staticmethod
+    def _mean_pool(model_output, attention_mask):
+        t = model_output.last_hidden_state
+        m = attention_mask.unsqueeze(-1).expand(t.size()).float()
+        return torch.sum(t * m, 1) / torch.clamp(m.sum(1), min=1e-9)
 
-    def _mean_pooling(self, model_output, attention_mask):
-        token_embeddings = model_output.last_hidden_state
-        input_mask_expanded = (
-            attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-        )
-        return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(
-            input_mask_expanded.sum(1), min=1e-9
-        )
-
+    @staticmethod
     def compression_ratio(
-        self, original_text: str, compressed_data: Dict[str, any]
+        original_text: str, compressed_data: Dict[str, any], compressor
     ) -> float:
-        original_size = len(original_text.encode("utf-8")) * 8
+        orig_bits = len(original_text.encode("utf-8")) * 8
+        comp_bits = compressor._calculate_compressed_size(compressed_data)
+        return orig_bits / comp_bits if comp_bits else float("inf")
 
-        if "masked_ids" in compressed_data:
-            mask_positions = compressed_data["mask_positions"]
-            original_length = compressed_data["original_length"]
-            compressed_size = (original_length - len(mask_positions)) * 32
-            compressed_size += len(mask_positions) * np.ceil(np.log2(original_length))
-        elif "quantized_states" in compressed_data:
-            quantized_states = compressed_data["quantized_states"]
-            quantization_bits = compressed_data["quantization_bits"]
-            compressed_size = quantized_states.size * quantization_bits + 64
-        else:
-            compressed_size = original_size
-        return original_size / compressed_size if compressed_size > 0 else float("inf")
-
+    @staticmethod
     def bits_per_character(
-        self, original_text: str, compressed_data: Dict[str, any]
+        original_text: str, compressed_data: Dict[str, any], compressor
     ) -> float:
-        if len(original_text) == 0:
+        if not original_text:
             return 0.0
-
-        if "masked_ids" in compressed_data:
-            mask_positions = compressed_data["mask_positions"]
-            original_length = compressed_data["original_length"]
-            compressed_bits = (original_length - len(mask_positions)) * 32
-            compressed_bits += len(mask_positions) * np.ceil(np.log2(original_length))
-        elif "quantized_states" in compressed_data:
-            quantized_states = compressed_data["quantized_states"]
-            quantization_bits = compressed_data["quantization_bits"]
-            compressed_bits = quantized_states.size * quantization_bits + 64
-        else:
-            compressed_bits = len(original_text) * 8
-
-        return compressed_bits / len(original_text)
+        comp_bits = compressor._calculate_compressed_size(compressed_data)
+        return comp_bits / len(original_text)
 
     def perplexity(self, model, tokenizer, text: str) -> float:
-        encoding = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
-        input_ids = encoding["input_ids"].to(self.device)
+        enc = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
         with torch.no_grad():
-            outputs = model(input_ids, labels=input_ids)
-            loss = outputs.loss
-            perplexity = torch.exp(loss).item()
-
-        return perplexity
+            loss = model(
+                enc["input_ids"].to(self.device),
+                labels=enc["input_ids"].to(self.device),
+            ).loss
+        return torch.exp(loss).item()

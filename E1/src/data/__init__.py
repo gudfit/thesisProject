@@ -1,6 +1,3 @@
-# src/data/__init__.py
-"""Data loading utilities."""
-
-from .data_loader import DataLoader, CompressionDataset
-
-__all__ = ["DataLoader", "CompressionDataset"]
+# E1/src/data/__init__.py
+from .data_loader import WikiDataLoader, CompressionDataset
+__all__ = ["WikiDataLoader", "CompressionDataset"]

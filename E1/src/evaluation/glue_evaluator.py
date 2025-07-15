@@ -1,9 +1,8 @@
 # src/evaluation/glue_evaluator.py
-"""GLUE benchmark evaluation for compressed models."""
 import torch
 import numpy as np
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Union
 from datasets import load_dataset, Value
 from transformers import (
     AutoTokenizer,
@@ -12,8 +11,7 @@ from transformers import (
     Trainer,
     DataCollatorWithPadding,
 )
-from sklearn.metrics import accuracy_score, f1_score
-
+from sklearn.metrics import accuracy_score, f1_score, matthews_corrcoef
 
 class GLUEEvaluator:
     TASK_CONFIGS = {
@@ -129,6 +127,7 @@ class GLUEEvaluator:
         if tokenized_train.features["labels"].dtype != "int64":
             tokenized_train = tokenized_train.cast_column("labels", Value("int64"))
             tokenized_eval = tokenized_eval.cast_column("labels", Value("int64"))
+
         training_args = TrainingArguments(
             output_dir=f"./tmp/{task}_eval",
             num_train_epochs=epochs,
@@ -142,17 +141,20 @@ class GLUEEvaluator:
             load_best_model_at_end=False,
             report_to="none",
             remove_unused_columns=True,
+            fp16=torch.cuda.is_available(),
+            dataloader_num_workers=0,
         )
 
         def compute_metrics(eval_pred):
             predictions, labels = eval_pred
             predictions = np.argmax(predictions, axis=1)
             if config["metric"] == "accuracy":
-                return {"accuracy": accuracy_score(labels, predictions)}
+                return {"eval_accuracy": accuracy_score(labels, predictions)}
             if config["metric"] == "f1":
-                return {"f1": f1_score(labels, predictions, average="binary")}
-            from sklearn.metrics import matthews_corrcoef
-            return {"matthews_correlation": matthews_corrcoef(labels, predictions)}
+                return {"eval_f1": f1_score(labels, predictions, average="binary")}
+            if config["metric"] == "matthews_correlation":
+                return {"eval_matthews_correlation": matthews_corrcoef(labels, predictions)}
+            return {}
 
         trainer = Trainer(
             model=classifier,
@@ -165,36 +167,20 @@ class GLUEEvaluator:
         )
         trainer.train()
         eval_results = trainer.evaluate()
-        main_metric = config["metric"]
-        score = (
-            eval_results.get(main_metric)
-            or eval_results.get(f"eval_{main_metric}")
-            or list(eval_results.values())[0]
-        )
+        main_metric = f"eval_{config['metric']}"
+        score = eval_results.get(main_metric, 0.0)
+        classifier.to("cpu")
         del classifier, trainer
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         return float(score)
 
     def _create_classifier_from_mlm(self, mlm_model: torch.nn.Module, num_labels: int) -> torch.nn.Module:
-        if hasattr(mlm_model, "bert"):
-            base_model_name = "bert-base-uncased"
-        elif hasattr(mlm_model, "roberta"):
-            base_model_name = "roberta-base"
-        elif hasattr(mlm_model, "distilbert"):
-            base_model_name = "distilbert-base-uncased"
-        else:
-            base_model_name = self.base_model_name
         classifier = AutoModelForSequenceClassification.from_pretrained(
-            base_model_name, num_labels=num_labels
+            self.base_model_name, num_labels=num_labels
         ).to(self.device)
         try:
-            if hasattr(mlm_model, "bert") and hasattr(classifier, "bert"):
-                classifier.bert.load_state_dict(mlm_model.bert.state_dict())
-            elif hasattr(mlm_model, "roberta") and hasattr(classifier, "roberta"):
-                classifier.roberta.load_state_dict(mlm_model.roberta.state_dict())
-            elif hasattr(mlm_model, "distilbert") and hasattr(classifier, "distilbert"):
-                classifier.distilbert.load_state_dict(mlm_model.distilbert.state_dict())
+            classifier.load_state_dict(mlm_model.state_dict(), strict=False)
         except Exception:
             pass
         return classifier
@@ -203,7 +189,7 @@ class GLUEEvaluator:
         self,
         model: torch.nn.Module,
         task: str = "sst2",
-        sample_sizes: List[int] | None = None,
+        sample_sizes: Union[List[int], None] = None,
     ) -> Dict[str, Any]:
         if sample_sizes is None:
             sample_sizes = [50, 100, 250, 500, 1000]
@@ -223,4 +209,3 @@ class GLUEEvaluator:
         results["min_samples_for_threshold"] = min_samples_needed
         results["threshold"] = threshold
         return results
-

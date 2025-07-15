@@ -1,14 +1,15 @@
-# src/data/data_loader.py
+# E1/src/data/data_loader.py
 """Data loading utilities for compression experiments."""
 
 from datasets import load_dataset
 from typing import List, Dict, Optional, Tuple
 import random
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset as TorchDataset
+from torch.utils.data import DataLoader as TorchDataLoader
 
 
-class CompressionDataset(Dataset):
+class CompressionDataset(TorchDataset):
     def __init__(self, texts: List[str], tokenizer, max_length: int = 512):
         self.texts = texts
         self.tokenizer = tokenizer
@@ -26,7 +27,6 @@ class CompressionDataset(Dataset):
             max_length=self.max_length,
             return_tensors="pt",
         )
-
         return {
             "text": text,
             "input_ids": encoding["input_ids"].squeeze(),
@@ -34,7 +34,7 @@ class CompressionDataset(Dataset):
         }
 
 
-class DataLoader:
+class WikiDataLoader:
     def __init__(
         self, dataset_name: str = "wikitext", dataset_config: str = "wikitext-2-raw-v1"
     ):
@@ -78,7 +78,7 @@ class DataLoader:
     ) -> Tuple[List[str], List[str]]:
         with open(file_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
-        texts = [line.strip() for line in lines if line.strip()]
+        texts = [line.rstrip("\n") for line in lines if line.strip()]
         random.shuffle(texts)
         split_idx = int(len(texts) * train_ratio)
         train_texts = texts[:split_idx]
@@ -92,18 +92,17 @@ class DataLoader:
         tokenizer,
         batch_size: int = 16,
         max_length: int = 512,
-    ) -> Tuple[DataLoader, DataLoader]:
+    ) -> Tuple[TorchDataLoader, TorchDataLoader]:
         train_dataset = CompressionDataset(train_texts, tokenizer, max_length)
         test_dataset = CompressionDataset(test_texts, tokenizer, max_length)
-        train_loader = DataLoader(
+        train_loader = TorchDataLoader(
             train_dataset,
             batch_size=batch_size,
             shuffle=True,
             num_workers=2,
             pin_memory=True,
         )
-
-        test_loader = DataLoader(
+        test_loader = TorchDataLoader(
             test_dataset,
             batch_size=batch_size,
             shuffle=False,
