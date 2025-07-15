@@ -255,3 +255,11 @@ class PredictiveMaskingCompressor(BaseCompressor):
 
             print(f"Epoch {epoch+1} Evaluation - Word Accuracy: {avg_word_acc:.4f}, Semantic Similarity: {avg_sem_sim:.4f}")
             self.model.train()
+
+    def calculate_model_size(self) -> dict[str, float]:
+        param_count = sum(p.numel() for p in self.model.parameters())
+        disk_size_mb = (param_count * 4) / (1024 ** 2)
+        return {
+            "disk_size_mb": disk_size_mb,
+            "param_count":  param_count,
+        }

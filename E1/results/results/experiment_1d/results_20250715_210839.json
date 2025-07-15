@@ -1,0 +1,139 @@
+{
+  "llm_lossless": {
+    "gpt2": {
+      "method": "Autoregressive Coding",
+      "model_name": "gpt2",
+      "is_lossless": true,
+      "avg_bits_per_character": 1.26066053220308,
+      "avg_compression_ratio": 6.362605775180866,
+      "reconstruction_accuracy": 1.0,
+      "model_size_mb": 474.7001953125
+    },
+    "gpt2-medium": {
+      "method": "Autoregressive Coding",
+      "model_name": "gpt2-medium",
+      "is_lossless": true,
+      "avg_bits_per_character": 1.1504181822665311,
+      "avg_compression_ratio": 6.972321983763257,
+      "reconstruction_accuracy": 1.0,
+      "model_size_mb": 1353.54296875
+    }
+  },
+  "llm_lossy": {
+    "bert-base-uncased_pm": {
+      "method": "Predictive Masking",
+      "model_name": "bert-base-uncased",
+      "is_lossless": false,
+      "model_size_mb": 417.7638931274414,
+      "masking_probability": 0.3,
+      "avg_bits_per_character": 4.9295097528842895,
+      "reconstruction_accuracy": 0.7658792643729346
+    },
+    "bert-base-uncased_lsq": {
+      "method": "Latent Space Quantization",
+      "model_name": "bert-base-uncased",
+      "is_lossless": false,
+      "quantization_bits": 8,
+      "avg_bits_per_character": 1327.8325483793735,
+      "reconstruction_accuracy": 0.8105823832008417,
+      "model_size_mb": 511.8178253173828
+    },
+    "roberta-base_pm": {
+      "method": "Predictive Masking",
+      "model_name": "roberta-base",
+      "is_lossless": false,
+      "model_size_mb": 475.68295669555664,
+      "masking_probability": 0.3,
+      "avg_bits_per_character": 5.105969446657943,
+      "reconstruction_accuracy": 0.894631941413444
+    },
+    "roberta-base_lsq": {
+      "method": "Latent Space Quantization",
+      "model_name": "roberta-base",
+      "is_lossless": false,
+      "quantization_bits": 8,
+      "avg_bits_per_character": 1376.9159668353948,
+      "reconstruction_accuracy": 0.9984660248774504,
+      "model_size_mb": 627.6530227661133
+    },
+    "distilbert-base-uncased_pm": {
+      "method": "Predictive Masking",
+      "model_name": "distilbert-base-uncased",
+      "is_lossless": false,
+      "model_size_mb": 255.5295181274414,
+      "masking_probability": 0.3,
+      "avg_bits_per_character": 4.9295097528842895,
+      "reconstruction_accuracy": 0.7325162186969847
+    },
+    "distilbert-base-uncased_lsq": {
+      "method": "Latent Space Quantization",
+      "model_name": "distilbert-base-uncased",
+      "is_lossless": false,
+      "quantization_bits": 8,
+      "avg_bits_per_character": 1327.8325483793735,
+      "reconstruction_accuracy": 0.8116153777222261,
+      "model_size_mb": 349.5834503173828
+    }
+  },
+  "traditional": {
+    "gzip": {
+      "description": "Gzip (LZ77-based)",
+      "total_original_size_mb": 0.6914911270141602,
+      "total_compressed_size_mb": 0.3975992202758789,
+      "avg_compression_ratio": 1.7391662049396397,
+      "avg_bits_per_character": 4.9665004212243105,
+      "std_bits_per_character": 0.857335222485541,
+      "total_compression_time": 0.03424954414367676,
+      "total_decompression_time": 0.02224588394165039,
+      "avg_compression_speed_mbps": 20.189790676143208,
+      "avg_decompression_speed_mbps": 31.08400317235762,
+      "is_lossless": true,
+      "system_size_mb": 0.001
+    },
+    "bzip2": {
+      "description": "Bzip2 (Burrows-Wheeler transform)",
+      "total_original_size_mb": 0.6914911270141602,
+      "total_compressed_size_mb": 0.42437076568603516,
+      "avg_compression_ratio": 1.6294504309134015,
+      "avg_bits_per_character": 5.3687535395637935,
+      "std_bits_per_character": 1.0451631651762163,
+      "total_compression_time": 0.0956571102142334,
+      "total_decompression_time": 0.030135393142700195,
+      "avg_compression_speed_mbps": 7.228852360953604,
+      "avg_decompression_speed_mbps": 22.946145873715356,
+      "is_lossless": true,
+      "system_size_mb": 0.001
+    },
+    "lzma": {
+      "description": "LZMA (Lempel-Ziv-Markov chain)",
+      "total_original_size_mb": 0.6914911270141602,
+      "total_compressed_size_mb": 0.4769287109375,
+      "avg_compression_ratio": 1.44988362234451,
+      "avg_bits_per_character": 6.173685322616027,
+      "std_bits_per_character": 1.498272308386027,
+      "total_compression_time": 29.280296087265015,
+      "total_decompression_time": 0.05535268783569336,
+      "avg_compression_speed_mbps": 0.023616261425543197,
+      "avg_decompression_speed_mbps": 12.492457982650345,
+      "is_lossless": true,
+      "system_size_mb": 0.001
+    },
+    "zstd": {
+      "description": "Zstandard (modern LZ-variant)",
+      "total_original_size_mb": 0.6914911270141602,
+      "total_compressed_size_mb": 0.39351367950439453,
+      "avg_compression_ratio": 1.7572225897840432,
+      "avg_bits_per_character": 4.855915483204226,
+      "std_bits_per_character": 0.6896599357862513,
+      "total_compression_time": 0.09395670890808105,
+      "total_decompression_time": 0.006647825241088867,
+      "avg_compression_speed_mbps": 7.359678037367763,
+      "avg_decompression_speed_mbps": 104.01764516013341,
+      "is_lossless": true,
+      "system_size_mb": 0.001
+    }
+  },
+  "comparative_analysis": {
+    "status": "Generated. See plots and tables for details."
+  }
+}
