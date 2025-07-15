@@ -36,7 +36,7 @@ class CompressionDataset(TorchDataset):
 
 class WikiDataLoader:
     def __init__(
-        self, dataset_name: str = "wikitext", dataset_config: str = "wikitext-2-raw-v1"
+        self, dataset_name: str = "wikitext", dataset_config: str = "wikitext-2-v1"
     ):
         self.dataset_name = dataset_name
         self.dataset_config = dataset_config

@@ -174,7 +174,7 @@ class CompressionExperimentRunner:
                 try:
                     compressed = compressor.compress(text, masking_probability=masking_prob)
                     reconstructed = compressor.decompress(compressed)
-                    metrics = self.metrics_calculator.calculate_all_metrics(text, reconstructed, compressed)
+                    metrics = self.metrics_calculator.calculate_all_metrics(text, reconstructed, compressed, compressor)
                     for key in self.METRIC_KEYS:
                         prob_results[key].append(metrics.get(key, 0))
                 except Exception as e:
@@ -208,7 +208,7 @@ class CompressionExperimentRunner:
                 try:
                     compressed = compressor.compress(text, quantization_bits=bits)
                     reconstructed = compressor.decompress(compressed)
-                    metrics = self.metrics_calculator.calculate_all_metrics(text, reconstructed, compressed)
+                    metrics = self.metrics_calculator.calculate_all_metrics(text, reconstructed, compressed, compressor)
                     for key in self.METRIC_KEYS:
                         prob_results[key].append(metrics.get(key, 0))
                 except Exception as e:
@@ -250,7 +250,7 @@ class CompressionExperimentRunner:
                 try:
                     compressed = compressor.compress(text)
                     reconstructed = compressor.decompress(compressed)
-                    metrics = self.metrics_calculator.calculate_all_metrics(text, reconstructed, compressed)
+                    metrics = self.metrics_calculator.calculate_all_metrics(text, reconstructed, compressed, compressor)
                     for key in self.METRIC_KEYS:
                         prob_results[key].append(metrics.get(key, 0))
                 except Exception as e:
