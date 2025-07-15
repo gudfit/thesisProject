@@ -11,12 +11,10 @@ from tqdm import tqdm
 import joblib
 import os
 
-
 class VectorQuantizationCompressor(BaseCompressor):
-    """Compression via Vector Quantization of latent space."""
-
     def __init__(self, model_name: str, device: str = "cuda"):
         super().__init__(model_name, device)
+        self._load_model()
         self.codebook = None
         self.decoder = None
         self._init_decoder()
@@ -33,8 +31,7 @@ class VectorQuantizationCompressor(BaseCompressor):
         all_hidden_states = []
 
         with torch.no_grad():
-            for i in tqdm(range(0, len(texts), 16),
-                          desc=f"Generating vectors for VQ codebook (k={num_clusters})"):
+            for i in tqdm(range(0, len(texts), 16), desc=f"Generating vectors for VQ codebook (k={num_clusters})"):
                 batch_texts = texts[i : i + 16]
                 encoding = self.tokenizer(
                     batch_texts,
@@ -45,7 +42,6 @@ class VectorQuantizationCompressor(BaseCompressor):
                 )
                 input_ids = encoding["input_ids"].to(self.device)
                 attention_mask = encoding["attention_mask"].to(self.device)
-
                 outputs = (
                     self.model.bert(input_ids=input_ids, attention_mask=attention_mask)
                     if hasattr(self.model, "bert") else
@@ -53,7 +49,6 @@ class VectorQuantizationCompressor(BaseCompressor):
                     if hasattr(self.model, "roberta") else
                     self.model.distilbert(input_ids=input_ids, attention_mask=attention_mask)
                 )
-
                 active_mask = attention_mask.bool()
                 active_states = outputs.last_hidden_state[active_mask].cpu().numpy()
                 all_hidden_states.append(active_states)
@@ -62,7 +57,6 @@ class VectorQuantizationCompressor(BaseCompressor):
         self.codebook.fit(all_hidden_states)
         os.makedirs(os.path.dirname(model_path), exist_ok=True)
         joblib.dump(self.codebook, model_path)
-        print(f"Trained and saved VQ codebook to {model_path}")
 
     def load_codebook(self, path: str):
         self.codebook = joblib.load(path)
@@ -83,8 +77,8 @@ class VectorQuantizationCompressor(BaseCompressor):
                 if hasattr(self.model, "roberta") else
                 self.model.distilbert(input_ids=input_ids, attention_mask=attention_mask)
             )
-            active_mask = attention_mask.bool().squeeze()
-            hidden_states = outputs.last_hidden_state.squeeze()[active_mask].cpu().numpy()
+            active_mask = attention_mask.bool().squeeze(0)
+            hidden_states = outputs.last_hidden_state.squeeze(0)[active_mask].cpu().numpy()
 
         cluster_indices = self.codebook.predict(hidden_states)
         return {
@@ -122,12 +116,27 @@ class VectorQuantizationCompressor(BaseCompressor):
         disk_size_mb = (param_count * 4) / (1024 ** 2)
         codebook_mb = 0
         if self.codebook is not None:
-            codebook_mb = (self.codebook.cluster_centers_.size * 4) / (1024 ** 2)
+            codebook_mb = (self.codebook.cluster_centers_.nbytes) / (1024 ** 2)
         return {
             "disk_size_mb": disk_size_mb + codebook_mb,
             "param_count": param_count,
             "codebook_size_mb": codebook_mb
         }
+
+    def fine_tune(self, train_texts: List[str], eval_texts: List[str], **kwargs):
+        num_clusters = kwargs.get("num_clusters")
+        codebook_path = kwargs.get("codebook_path")
+
+        if not num_clusters or not codebook_path:
+            raise ValueError("fine_tune for VQ requires 'num_clusters' and 'codebook_path' in kwargs.")
+
+        self.train_codebook(texts=train_texts, num_clusters=num_clusters, model_path=codebook_path)
+        self.train_decoder(
+            texts=train_texts,
+            epochs=kwargs.get("epochs", 10),
+            batch_size=kwargs.get("batch_size", 16),
+            learning_rate=kwargs.get("learning_rate", 1e-3),
+        )
 
     def train_decoder(self, texts: List[str], epochs: int = 10, batch_size: int = 16, learning_rate: float = 1e-3):
         optimizer = torch.optim.Adam(self.decoder.parameters(), lr=learning_rate)
@@ -136,7 +145,9 @@ class VectorQuantizationCompressor(BaseCompressor):
 
         for epoch in range(epochs):
             total_loss = 0
-            for i in tqdm(range(0, len(texts), batch_size), desc=f"Training VQ Decoder Epoch {epoch+1}"):
+            num_batches = 0
+            progress_bar = tqdm(range(0, len(texts), batch_size), desc=f"Training VQ Decoder Epoch {epoch+1}")
+            for i in progress_bar:
                 batch_texts = texts[i : i + batch_size]
                 encoding = self.tokenizer(
                     batch_texts,
@@ -164,7 +175,6 @@ class VectorQuantizationCompressor(BaseCompressor):
                 loss.backward()
                 optimizer.step()
                 total_loss += loss.item()
-
-            avg_loss = total_loss / max(1, len(texts) // batch_size)
-            print(f"VQ Decoder Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}")
+                num_batches += 1
+                progress_bar.set_postfix(loss=total_loss/num_batches)
         self.decoder.eval()

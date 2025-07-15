@@ -6,7 +6,7 @@ import torch.nn as nn
 import numpy as np
 from typing import Dict, List, Tuple, Optional
 from .base_compressor import BaseCompressor
-
+from tqdm.auto import tqdm
 
 class QuantizationDecoder(nn.Module):
     def __init__(self, hidden_size: int, vocab_size: int):
@@ -31,6 +31,7 @@ class LatentSpaceQuantizationCompressor(BaseCompressor):
         self, model_name: str, device: str = "cuda", quantization_bits: int = 8
     ):
         super().__init__(model_name, device)
+        self._load_model()
         self.quantization_bits = quantization_bits
         self.decoder = None
         self._init_decoder()
@@ -113,19 +114,20 @@ class LatentSpaceQuantizationCompressor(BaseCompressor):
         metadata_bits = 2 * 32
         return state_bits + metadata_bits
 
+    def fine_tune(self, train_texts: List[str], eval_texts: List[str], **kwargs):
+        self.train_decoder(
+            texts=train_texts,
+            epochs=kwargs.get("epochs", 10),
+            batch_size=kwargs.get("batch_size", 16),
+            learning_rate=kwargs.get("learning_rate", 1e-3),
+        )
+
     def calculate_model_size(self) -> dict[str, float]:
-        """
-        Return the approximate disk footprint (FP‑32 weights) and parameter count
-        for the encoder *and* the small decoder we train on top.
-        """
         param_count = (
             sum(p.numel() for p in self.model.parameters()) +
             sum(p.numel() for p in self.decoder.parameters())
         )
-        # 4 bytes per fp32 parameter  → MB
         disk_size_mb = (param_count * 4) / (1024 ** 2)
-
-        # add extra tables / codebooks here if you store any
         extras_mb = 0.0
         return {
             "disk_size_mb": disk_size_mb + extras_mb,
@@ -141,16 +143,14 @@ class LatentSpaceQuantizationCompressor(BaseCompressor):
     ):
         optimizer = torch.optim.Adam(self.decoder.parameters(), lr=learning_rate)
         criterion = nn.CrossEntropyLoss()
-
         self.decoder.train()
 
         for epoch in range(epochs):
             total_loss = 0
             num_batches = 0
-
-            for i in range(0, len(texts), batch_size):
+            progress_bar = tqdm(range(0, len(texts), batch_size), desc=f"Training Decoder Epoch {epoch+1}/{epochs}")
+            for i in progress_bar:
                 batch_texts = texts[i : i + batch_size]
-
                 encoding = self.tokenizer(
                     batch_texts,
                     truncation=True,
@@ -158,7 +158,6 @@ class LatentSpaceQuantizationCompressor(BaseCompressor):
                     return_tensors="pt",
                     max_length=512,
                 )
-
                 input_ids = encoding["input_ids"].to(self.device)
                 attention_mask = encoding["attention_mask"].to(self.device)
 
@@ -188,9 +187,7 @@ class LatentSpaceQuantizationCompressor(BaseCompressor):
 
                 total_loss += loss.item()
                 num_batches += 1
-
-            avg_loss = total_loss / num_batches
-            print(f"Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}")
+                progress_bar.set_postfix(loss=total_loss / num_batches)
         self.decoder.eval()
 
     def vector_quantization(self, text: str, num_clusters: int = 256) -> Dict[str, any]:
