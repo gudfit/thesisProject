@@ -127,14 +127,14 @@ class PredictiveMaskingCompressor(BaseCompressor):
                 pos_per_token.append(None)
         return pos_per_token
 
-    def decompress(self, compressed_data: Dict[str, any], num_passes: int = 50) -> str:
+    def decompress(self, compressed_data: Dict[str, any], num_passes: int = 50, return_ids_for_debug: bool = False):
         self.model.eval()
         original_length = compressed_data["original_length"]
         unmasked_tokens = compressed_data["unmasked_tokens"]
         unmasked_indices = compressed_data["unmasked_indices"]
 
         decompress_ids = torch.full((1, original_length), self.mask_token_id, dtype=torch.long, device=self.device)
-        decompress_ids[0, unmasked_indices] = torch.tensor(unmasked_tokens, dtype=torch.long)
+        decompress_ids[0, unmasked_indices] = torch.tensor(unmasked_tokens, dtype=torch.long, device=self.device)
 
         special_token_ids = self.tokenizer.all_special_ids
 
@@ -154,11 +154,14 @@ class PredictiveMaskingCompressor(BaseCompressor):
             best_position_to_fill = mask_positions[best_mask_idx_in_flat_list]
 
             token_logits = logits[best_position_to_fill[0], best_position_to_fill[1]]
-
             token_logits[special_token_ids] = -float('inf')
 
             best_token_id = token_logits.argmax(dim=-1)
             decompress_ids[best_position_to_fill[0], best_position_to_fill[1]] = best_token_id
+
+        if return_ids_for_debug:
+            reconstructed_text = self.tokenizer.decode(decompress_ids.squeeze(), skip_special_tokens=True)
+            return reconstructed_text, decompress_ids.squeeze()
 
         return self.tokenizer.decode(decompress_ids.squeeze(), skip_special_tokens=True)
 
@@ -244,7 +247,7 @@ class PredictiveMaskingCompressor(BaseCompressor):
                     total_word_acc += metrics_calculator.word_accuracy(text, reconstructed_text)
                     total_sem_sim += metrics_calculator.semantic_similarity(text, reconstructed_text)
                     count += 1
-                except Exception:
+                except Exception as e:
                     continue
 
             avg_word_acc = total_word_acc / count if count > 0 else 0

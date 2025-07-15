@@ -50,10 +50,10 @@ class CompressionExperimentRunner:
             style=self.config['visualization']['style'],
             figure_dir=os.path.join(self.config['experiment']['output_dir'], 'figures')
         )
-        
+
         self.METRIC_KEYS = [
-            'compression_ratio', 'word_accuracy', 'character_accuracy', 
-            'semantic_similarity', 'rouge1_fmeasure', 'rouge2_fmeasure', 
+            'compression_ratio', 'word_accuracy', 'character_accuracy',
+            'semantic_similarity', 'rouge1_fmeasure', 'rouge2_fmeasure',
             'rougeL_fmeasure', 'bert_score_f1', 'bits_per_character'
         ]
 
@@ -128,7 +128,7 @@ class CompressionExperimentRunner:
                 model_name, train_texts, test_samples
             )
             all_results[f"{model_name}_lsq"] = lsq_results
-            
+
             # Run vector quantization experiments
             vq_results = self.run_vector_quantization_experiments(
                 model_name, train_texts, test_samples
@@ -153,7 +153,7 @@ class CompressionExperimentRunner:
         compressor = PredictiveMaskingCompressor(
             model_name=model_name, device=self.config['experiment']['device']
         )
-        
+
         # Fine-tune once
         if self.config['training']['epochs'] > 0:
             self.logger.info(f"Fine-tuning {model_name} for PM...")
@@ -169,7 +169,7 @@ class CompressionExperimentRunner:
         for masking_prob in self.config['compression']['masking_probabilities']:
             self.logger.info(f"Testing masking probability: {masking_prob}")
             prob_results = {key: [] for key in self.METRIC_KEYS}
-            
+
             for text in tqdm(test_samples, desc=f"PM prob {masking_prob}", leave=False):
                 try:
                     compressed = compressor.compress(text, masking_probability=masking_prob)
@@ -180,7 +180,7 @@ class CompressionExperimentRunner:
                 except Exception as e:
                     self.logger.error(f"Error processing text (PM): {text[:50]}... | {e}")
                     continue
-            
+
             results[masking_prob] = {key: np.mean(values) if values else 0 for key, values in prob_results.items()}
         return results
 
@@ -193,7 +193,7 @@ class CompressionExperimentRunner:
         compressor = LatentSpaceQuantizationCompressor(
             model_name=model_name, device=self.config['experiment']['device']
         )
-        
+
         # Train decoder once
         self.logger.info(f"Training LSQ decoder for {model_name}...")
         compressor.train_decoder(
@@ -214,11 +214,11 @@ class CompressionExperimentRunner:
                 except Exception as e:
                     self.logger.error(f"Error processing text (LSQ): {text[:50]}... | {e}")
                     continue
-            
+
             results[bits] = {key: np.mean(values) if values else 0 for key, values in prob_results.items()}
             results[bits]['quantization_bits'] = bits
         return results
-        
+
     def run_vector_quantization_experiments(self, model_name: str, train_texts: List[str],
                                             test_samples: List[str]) -> Dict:
         """Run vector quantization experiments for a model."""
@@ -228,7 +228,7 @@ class CompressionExperimentRunner:
         compressor = VectorQuantizationCompressor(
             model_name=model_name, device=self.config['experiment']['device']
         )
-        
+
         # Train decoder once
         self.logger.info(f"Training VQ decoder for {model_name}...")
         compressor.train_decoder(
@@ -237,13 +237,13 @@ class CompressionExperimentRunner:
 
         for k in self.config['compression']['vq_codebook_sizes']:
             self.logger.info(f"Testing VQ with {k} clusters...")
-            
+
             # Train the codebook for this k
             codebook_path = os.path.join(
                 self.config['experiment']['output_dir'], 'models', f"{model_name.replace('/', '_')}_vq_codebook_k{k}.joblib"
             )
             compressor.train_codebook(train_texts[:2000], num_clusters=k, model_path=codebook_path)
-            
+
             prob_results = {key: [] for key in self.METRIC_KEYS}
 
             for text in tqdm(test_samples, desc=f"VQ k={k}", leave=False):
@@ -256,7 +256,7 @@ class CompressionExperimentRunner:
                 except Exception as e:
                     self.logger.error(f"Error processing text (VQ): {text[:50]}... | {e}")
                     continue
-            
+
             results[k] = {key: np.mean(values) if values else 0 for key, values in prob_results.items()}
             results[k]['codebook_size'] = k
         return results
@@ -266,7 +266,7 @@ class CompressionExperimentRunner:
         results_path = os.path.join(
             self.config['experiment']['output_dir'], 'results', f'results_{datetime.now():%Y%m%d_%H%M%S}.json'
         )
-        
+
         def convert_to_serializable(obj):
             if isinstance(obj, np.ndarray): return obj.tolist()
             if isinstance(obj, np.generic): return obj.item()
@@ -286,7 +286,7 @@ class CompressionExperimentRunner:
                     row = {'model_method': model_method, 'hyperparameter': param,
                            **{k: v for k, v in metrics.items() if not isinstance(v, list)}}
                     csv_data.append(row)
-        
+
         if csv_data:
             df = pd.DataFrame(csv_data)
             csv_path = results_path.replace('.json', '.csv')
@@ -298,7 +298,7 @@ class CompressionExperimentRunner:
         self.visualizer.plot_efficiency_vs_fidelity_tradeoff(
             results, save_name="all_methods_tradeoff"
         )
-        
+
         pm_results = {k: v for k, v in results.items() if 'predictive_masking' in k}
         lsq_results = {k: v for k, v in results.items() if 'lsq' in k}
         vq_results = {k: v for k, v in results.items() if 'vq' in k}

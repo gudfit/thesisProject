@@ -5,12 +5,13 @@ import torch
 import numpy as np
 from typing import Dict
 from rouge_score import rouge_scorer
-from bert_score import score as bert_score
+from bert_score import BERTScorer
 from transformers import AutoTokenizer, AutoModel
 from sklearn.metrics.pairwise import cosine_similarity
 import nltk
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 import Levenshtein
+import collections
 
 for res in ("punkt", "punkt_tab"):
     try:
@@ -25,16 +26,10 @@ class CompressionMetrics:
         self.rouge_scorer = rouge_scorer.RougeScorer(
             ["rouge1", "rouge2", "rougeL"], use_stemmer=True
         )
-        try:
-            nltk.data.find("tokenizers/punkt")
-        except LookupError:
-            nltk.download("punkt")
-        self.semantic_model = AutoModel.from_pretrained(
-            "sentence-transformers/all-MiniLM-L6-v2"
-        ).to(device)
-        self.semantic_tokenizer = AutoTokenizer.from_pretrained(
-            "sentence-transformers/all-MiniLM-L6-v2"
-        )
+
+        self.semantic_tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
+        self.semantic_model = AutoModel.from_pretrained("sentence-transformers/all-MiniLM-L6-v2").to(device)
+        self.bert_scorer = BERTScorer(lang="en", model_type='roberta-large', device=device)
 
     def calculate_all_metrics(
         self,
@@ -75,17 +70,25 @@ class CompressionMetrics:
 
     @staticmethod
     def word_accuracy(original: str, reconstructed: str) -> float:
-        ow, rw = original.split(), reconstructed.split()
-        if not ow:
-            return 1.0 if not rw else 0.0
-        return 1 - Levenshtein.distance(" ".join(ow), " ".join(rw)) / max(len(ow), 1)
+        original_words = original.lower().split()
+        reconstructed_words = reconstructed.lower().split()
+        if not original_words:
+            return 1.0 if not reconstructed_words else 0.0
+
+        original_counts = collections.Counter(original_words)
+        reconstructed_counts = collections.Counter(reconstructed_words)
+
+        common_words_counts = original_counts & reconstructed_counts
+        correct_words = sum(common_words_counts.values())
+
+        return correct_words / len(original_words)
 
     @staticmethod
     def levenshtein_distance(original: str, reconstructed: str) -> float:
         if not original and not reconstructed:
             return 0.0
         return Levenshtein.distance(original, reconstructed) / max(
-            len(original), len(reconstructed)
+            len(original), len(reconstructed), 1
         )
 
     def rouge_scores(self, original: str, reconstructed: str) -> Dict[str, float]:
@@ -113,9 +116,13 @@ class CompressionMetrics:
         )
 
     def bert_score(self, original: str, reconstructed: str) -> Dict[str, float]:
-        P, R, F1 = bert_score(
-            [reconstructed], [original], lang="en", device=self.device, verbose=False
-        )
+        if not original.strip() or not reconstructed.strip():
+            return {
+                "bert_score_precision": 0.0,
+                "bert_score_recall": 0.0,
+                "bert_score_f1": 0.0,
+            }
+        P, R, F1 = self.bert_scorer.score([reconstructed], [original])
         return {
             "bert_score_precision": P.mean().item(),
             "bert_score_recall": R.mean().item(),
@@ -123,6 +130,8 @@ class CompressionMetrics:
         }
 
     def semantic_similarity(self, original: str, reconstructed: str) -> float:
+        if not original.strip() or not reconstructed.strip():
+            return 0.0
         with torch.no_grad():
             o_enc = self.semantic_tokenizer(
                 original,
