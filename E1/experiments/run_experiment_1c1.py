@@ -16,7 +16,6 @@ import seaborn as sns
 from tqdm import tqdm
 import torch
 
-# Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.models.compression_techniques import ModelCompressor
@@ -48,6 +47,9 @@ class Experiment1CRunner:
                 logging.StreamHandler()
             ]
         )
+        logging.getLogger("transformers").setLevel(logging.ERROR)
+        logging.getLogger("datasets").setLevel(logging.ERROR)
+        logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
         self.logger = logging.getLogger(__name__)
 
     def _create_output_dirs(self):
@@ -87,7 +89,6 @@ class Experiment1CRunner:
             self.print_summary(results, fidelity_method)
 
         self.logger.info("\nAll configured Experiment 1C runs completed!")
-
 
     def _create_pruning_variants(self, compressor: ModelCompressor, pruning_types: List[str], pruning_levels: List[float]) -> Dict:
         variants = {}
@@ -130,7 +131,8 @@ class Experiment1CRunner:
             downstream_results = self._evaluate_downstream_performance(info['model'], model_name)
             comp_results = self._evaluate_computational_performance(info['model'], compressor)
             
-            model_results['variants'][key] = info
+            serializable_info = {k: v for k, v in info.items() if k != 'model'}
+            model_results['variants'][key] = serializable_info
             model_results['phase1_structural_fidelity'][key] = structural_results
             model_results['phase2_downstream_performance'][key] = downstream_results
             model_results['phase3_computational_performance'][key] = comp_results
@@ -150,7 +152,8 @@ class Experiment1CRunner:
         
         crumpled_metrics = CrumpledPaperMetrics()
         test_texts = self._get_fidelity_test_texts()
-        self._run_gzip_baseline_check(crumpled_metrics, test_texts[0])
+        if test_texts:
+            self._run_gzip_baseline_check(crumpled_metrics, test_texts[0])
 
         temp_compressor = PredictiveMaskingCompressor(model_name)
         temp_compressor.model = model
@@ -172,7 +175,8 @@ class Experiment1CRunner:
         self.logger.info("Phase 1: Evaluating structural fidelity (via Direct MLM)")
         crumpled_metrics = CrumpledPaperMetrics()
         test_texts = self._get_fidelity_test_texts()
-        self._run_gzip_baseline_check(crumpled_metrics, test_texts[0])
+        if test_texts:
+            self._run_gzip_baseline_check(crumpled_metrics, test_texts[0])
 
         masking_prob = self.config['experiment_1c']['structural_fidelity']['masking_probability']
         all_metrics = []
@@ -184,6 +188,8 @@ class Experiment1CRunner:
                 
                 num_to_mask = int(input_ids.shape[1] * masking_prob)
                 maskable_indices = (input_ids[0] != tokenizer.cls_token_id) & (input_ids[0] != tokenizer.sep_token_id)
+                if maskable_indices.sum() < num_to_mask: continue
+                
                 mask_positions = torch.where(maskable_indices)[0][torch.randperm(maskable_indices.sum())[:num_to_mask]]
                 
                 masked_input = input_ids.clone()
@@ -226,22 +232,25 @@ class Experiment1CRunner:
         glue_evaluator = GLUEEvaluator(model_name, self.config['experiment']['device'])
         return glue_evaluator.evaluate_on_tasks(
             model,
-            tasks=glue_config['tasks'],
-            train_samples=glue_config['train_samples'],
-            eval_samples=glue_config['eval_samples'],
-            epochs=glue_config['fine_tune_epochs']
+            tasks=glue_config.get('tasks', []),
+            train_samples=glue_config.get('train_samples', 500),
+            eval_samples=glue_config.get('eval_samples', 200),
+            epochs=glue_config.get('fine_tune_epochs', 5)
         )
 
     def _evaluate_computational_performance(self, model: torch.nn.Module, compressor: ModelCompressor) -> Dict:
         self.logger.info("Phase 3: Evaluating computational performance")
         from datasets import load_dataset
         bench_conf = self.config['experiment_1c']['benchmark']
-        dataset = load_dataset('wikitext', 'wikitext-2-raw-v1', split=f'test[:{bench_conf["batch_size"]*2}]')
-        test_texts = [item['text'].strip() for item in dataset if len(item['text'].strip()) > 50][:bench_conf["batch_size"]]
+        batch_size = bench_conf.get('batch_size', 8)
+        dataset = load_dataset('wikitext', 'wikitext-2-raw-v1', split=f'test[:{batch_size*2}]')
+        test_texts = [item['text'].strip() for item in dataset if len(item['text'].strip()) > 50][:batch_size]
         
-        perf_metrics = compressor.measure_inference_performance(
-            model, test_texts, batch_size=bench_conf['batch_size']
-        )
+        if not test_texts:
+            self.logger.warning("No suitable texts found for computational benchmark.")
+            return {}
+
+        perf_metrics = compressor.measure_inference_performance(model, test_texts, batch_size=batch_size)
         param_stats = compressor.count_nonzero_parameters(model)
         perf_metrics.update(param_stats)
         return perf_metrics
@@ -258,28 +267,26 @@ class Experiment1CRunner:
         axes = axes.flatten()
         for model_name, model_results in results.items():
             for pruning_type in self.config['experiment_1c']['pruning']['type']:
-                sparsity_levels, tcm_values, pcm_values, glue_scores, inference_times = [], [], [], [], []
-                for variant_key, variant_info in model_results['variants'].items():
-                    if variant_info['pruning_type'] != pruning_type and variant_info['pruning_type'] != 'none':
-                        continue
-                    sparsity = variant_info['sparsity']
-                    sparsity_levels.append(sparsity)
-                    tcm_values.append(model_results['phase1_structural_fidelity'][variant_key]['mean_tcm'])
-                    pcm_values.append(model_results['phase1_structural_fidelity'][variant_key]['mean_pcm'])
-                    glue_scores.append(model_results['phase2_downstream_performance'][variant_key]['average'])
-                    inference_times.append(model_results['phase3_computational_performance'][variant_key]['avg_latency_ms'])
+                data = {'sparsity': [], 'tcm': [], 'pcm': [], 'glue': [], 'latency': []}
+                for key, info in model_results['variants'].items():
+                    if info['pruning_type'] not in [pruning_type, 'none']: continue
+                    data['sparsity'].append(info['sparsity'])
+                    data['tcm'].append(model_results['phase1_structural_fidelity'][key]['mean_tcm'])
+                    data['pcm'].append(model_results['phase1_structural_fidelity'][key]['mean_pcm'])
+                    data['glue'].append(model_results['phase2_downstream_performance'][key]['average'])
+                    data['latency'].append(model_results['phase3_computational_performance'][key]['avg_latency_ms'])
                 
-                idx = np.argsort(sparsity_levels)
+                idx = np.argsort(data['sparsity'])
                 label = f"{model_name.split('-')[0].upper()} ({pruning_type})"
-                axes[0].plot(np.array(sparsity_levels)[idx] * 100, np.array(tcm_values)[idx], 'o-', label=label)
-                axes[1].plot(np.array(sparsity_levels)[idx] * 100, np.array(pcm_values)[idx], 's-', label=label)
-                axes[2].plot(np.array(sparsity_levels)[idx] * 100, np.array(glue_scores)[idx], '^-', label=label)
-                axes[3].plot(np.array(sparsity_levels)[idx] * 100, np.array(inference_times)[idx], 'd-', label=label)
+                axes[0].plot(np.array(data['sparsity'])[idx] * 100, np.array(data['tcm'])[idx], 'o-', label=label)
+                axes[1].plot(np.array(data['sparsity'])[idx] * 100, np.array(data['pcm'])[idx], 's-', label=label)
+                axes[2].plot(np.array(data['sparsity'])[idx] * 100, np.array(data['glue'])[idx], '^-', label=label)
+                axes[3].plot(np.array(data['sparsity'])[idx] * 100, np.array(data['latency'])[idx], 'd-', label=label)
 
-        titles = ['TCM vs Pruning', 'PCM vs Pruning', 'GLUE Score vs Pruning', 'Latency vs Pruning']
-        for ax, title in zip(axes, titles):
+        titles_y = ['Mean TCM', 'Mean PCM', 'Avg GLUE Score', 'Avg Latency (ms)']
+        for ax, title in zip(axes, titles_y):
             ax.set_xlabel('Sparsity (%)')
-            ax.set_title(title)
+            ax.set_ylabel(title)
             ax.legend()
             ax.grid(True, alpha=0.4)
         plt.suptitle(f'Pruning Trade-off Analysis (Fidelity: {suffix})', fontsize=16)
@@ -292,7 +299,8 @@ class Experiment1CRunner:
         models = list(results.keys())
         sparsity_levels = self.config['experiment_1c']['pruning']['levels']
         pruning_types = self.config['experiment_1c']['pruning']['type']
-        fig, axes = plt.subplots(1, 2, figsize=(15, len(models) * len(pruning_types) * 0.5))
+        
+        fig, axes = plt.subplots(1, 2, figsize=(16, len(models) * len(pruning_types) * 0.6), sharey=True)
         
         for ax, metric in zip(axes, ['tcm', 'pcm']):
             data = []
@@ -301,48 +309,121 @@ class Experiment1CRunner:
                 for ptype in pruning_types:
                     row = [results[model]['phase1_structural_fidelity'].get(f"{ptype}_{s}" if s!=0 else "original", {}).get(f'mean_{metric}', 0) for s in sparsity_levels]
                     data.append(row)
-                    yticklabels.append(f"{model.split('-')[0]}({ptype[0]})")
+                    yticklabels.append(f"{model.split('-')[0]}({ptype[:4]})")
             
-            sns.heatmap(data, xticklabels=[f'{s:.0%}' for s in sparsity_levels],
-                        yticklabels=yticklabels, annot=True, fmt='.1f', cmap='YlOrRd', ax=ax, cbar_kws={'label': f'Mean {metric.upper()}'})
+            sns.heatmap(data, xticklabels=[f'{s:.0%}' for s in sparsity_levels], yticklabels=yticklabels, 
+                        annot=True, fmt='.1f', cmap='YlOrRd', ax=ax, cbar_kws={'label': f'Mean {metric.upper()}'})
             ax.set_title(f'Mean {metric.upper()}')
         
-        plt.suptitle(f'Structural Fidelity Degradation (Fidelity: {suffix})', fontsize=16)
+        plt.suptitle(f'Structural Fidelity Degradation (Method: {suffix})', fontsize=16)
         plt.tight_layout(rect=[0, 0, 1, 0.95])
         path = os.path.join(self.config['experiment']['output_dir'], 'figures', 'experiment_1c', f'structural_fidelity_heatmap_{suffix}.png')
         plt.savefig(path, dpi=300)
         plt.close()
 
     def _plot_computational_performance(self, results: Dict[str, Any], suffix: str):
-        # Implementation for this plot remains similar, just add suffix to save path
-        pass
+        fig, axes = plt.subplots(1, 3, figsize=(20, 6))
+        for model_name, model_results in results.items():
+            for ptype in self.config['experiment_1c']['pruning']['type']:
+                data = {'sparsity': [], 'memory': [], 'throughput': [], 'ratio': []}
+                for key, info in model_results['variants'].items():
+                    if info['pruning_type'] not in [ptype, 'none']: continue
+                    data['sparsity'].append(info['sparsity'])
+                    comp = model_results['phase3_computational_performance'][key]
+                    data['memory'].append(comp.get('memory_footprint_mb', 0))
+                    data['throughput'].append(comp.get('throughput_samples_per_sec', 0))
+                    data['ratio'].append(comp.get('compression_ratio', 1.0))
+                
+                idx = np.argsort(data['sparsity'])
+                label = f"{model_name.split('-')[0].upper()} ({ptype})"
+                axes[0].plot(np.array(data['sparsity'])[idx] * 100, np.array(data['memory'])[idx], 'o-', label=label)
+                axes[1].plot(np.array(data['sparsity'])[idx] * 100, np.array(data['throughput'])[idx], 's-', label=label)
+                axes[2].plot(np.array(data['sparsity'])[idx] * 100, np.array(data['ratio'])[idx], '^-', label=label)
+
+        titles = ['Memory Usage (MB)', 'Inference Throughput (samples/sec)', 'Actual Compression Ratio']
+        for ax, title in zip(axes, titles):
+            ax.set_xlabel('Sparsity (%)')
+            ax.set_ylabel(title)
+            ax.legend()
+            ax.grid(True, alpha=0.4)
+        plt.suptitle(f'Computational Performance vs Pruning (Method: {suffix})', fontsize=16)
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
+        path = os.path.join(self.config['experiment']['output_dir'], 'figures', 'experiment_1c', f'computational_performance_{suffix}.png')
+        plt.savefig(path, dpi=300)
+        plt.close()
 
     def _plot_combined_summary(self, results: Dict[str, Any], suffix: str):
-        # Implementation for this plot remains similar, just add suffix to save path
-        pass
+        fig, ax = plt.subplots(figsize=(12, 8))
+        weights = self.config['experiment_1c']['sweet_spot_weights']
+
+        for model_name, model_results in results.items():
+            for ptype in self.config['experiment_1c']['pruning']['type']:
+                data = {'sparsity': [], 'score': []}
+                for key, info in model_results['variants'].items():
+                    if info['pruning_type'] not in [ptype, 'none']: continue
+                    data['sparsity'].append(info['sparsity'])
+                    
+                    structural = model_results['phase1_structural_fidelity'][key]
+                    downstream = model_results['phase2_downstream_performance'][key]
+                    computational = model_results['phase3_computational_performance'][key]
+                    
+                    tcm = structural.get('mean_tcm', float('inf'))
+                    tcm_score = 1.0 / (1.0 + tcm) if np.isfinite(tcm) else 0
+                    glue_score = downstream.get('average', 0)
+                    throughput = computational.get('throughput_samples_per_sec', 1)
+                    efficiency_score = np.clip(throughput / 200, 0, 1) 
+                    
+                    combined = (weights['downstream_performance'] * glue_score +
+                                weights['structural_fidelity'] * tcm_score +
+                                weights['computational_efficiency'] * efficiency_score)
+                    data['score'].append(combined)
+
+                idx = np.argsort(data['sparsity'])
+                sparsity_levels = np.array(data['sparsity'])[idx]
+                scores = np.array(data['score'])[idx]
+                label = f"{model_name.split('-')[0].upper()} ({ptype})"
+                ax.plot(sparsity_levels * 100, scores, 'o-', label=label, linewidth=3)
+                if len(scores) > 0:
+                    best_idx = np.argmax(scores)
+                    ax.scatter(sparsity_levels[best_idx] * 100, scores[best_idx],
+                               s=250, marker='*', edgecolors='black', linewidth=1.5, zorder=5)
+
+        ax.set_xlabel('Sparsity (%)', fontsize=14)
+        ax.set_ylabel('Combined Performance Score', fontsize=14)
+        ax.set_title(f'Sweet Spot Analysis (Fidelity: {suffix})', fontsize=16)
+        ax.legend(fontsize=12)
+        ax.grid(True, alpha=0.3)
+        plt.tight_layout()
+        path = os.path.join(self.config['experiment']['output_dir'], 'figures', 'experiment_1c', f'sweet_spot_analysis_{suffix}.png')
+        plt.savefig(path, dpi=300)
+        plt.close()
 
     def save_results(self, results: Dict[str, Any], method_suffix: str):
         def convert(obj):
-            if isinstance(obj, (np.ndarray, list)): return [convert(i) for i in obj]
+            if isinstance(obj, np.generic): return obj.item()
+            if isinstance(obj, np.ndarray): return obj.tolist()
+            if isinstance(obj, (list, tuple)): return [convert(i) for i in obj]
             if isinstance(obj, dict): return {k: convert(v) for k, v in obj.items()}
-            if hasattr(obj, 'item'): return obj.item()
             return obj
 
         results_dir = os.path.join(self.config['experiment']['output_dir'], 'results', 'experiment_1c')
         os.makedirs(results_dir, exist_ok=True)
         results_path = os.path.join(results_dir, f'results_{method_suffix}_{datetime.now():%Y%m%d_%H%M%S}.json')
+        serializable_results = convert(results)
         with open(results_path, 'w') as f:
-            json.dump(convert(results), f, indent=2)
+            json.dump(serializable_results, f, indent=2)
         
         summary_data = []
         for model_name, model_results in results.items():
             for key, info in model_results.get('variants', {}).items():
-                row = {'model': model_name, 'variant': key, 'sparsity': info['sparsity'],
-                       'pruning_type': info['pruning_type'], 'size_mb': info['size_mb']}
+                row = info.copy() 
+                row['model_name'] = model_name
+                row['variant_key'] = key
+                
                 row.update(model_results['phase1_structural_fidelity'].get(key, {}))
                 row.update(model_results['phase2_downstream_performance'].get(key, {}))
                 comp = model_results['phase3_computational_performance'].get(key, {})
-                row.update({k: comp.get(k) for k in ['avg_latency_ms', 'throughput_samples_per_sec', 'memory_footprint_mb', 'compression_ratio']})
+                row.update({k: comp.get(k) for k in ['avg_latency_ms', 'throughput_samples_per_sec', 'memory_footprint_mb', 'compression_ratio', 'total_parameters', 'nonzero_parameters']})
                 summary_data.append(row)
         
         if summary_data:
@@ -356,28 +437,32 @@ class Experiment1CRunner:
         for model_name, model_results in results.items():
             self.logger.info(f"\n{model_name.upper()}:\n" + "-" * 40)
             best_info = {'score': -1, 'key': ''}
-            for key in model_results['variants']:
+            for key in model_results.get('variants', {}):
                 structural = model_results['phase1_structural_fidelity'].get(key, {})
                 downstream = model_results['phase2_downstream_performance'].get(key, {})
                 computational = model_results['phase3_computational_performance'].get(key, {})
-                tcm_score = 1.0 / (1.0 + structural.get('mean_tcm', float('inf')))
+                
+                tcm = structural.get('mean_tcm', float('inf'))
+                tcm_score = 1.0 / (1.0 + tcm) if np.isfinite(tcm) else 0
                 glue_score = downstream.get('average', 0)
-                efficiency_score = computational.get('throughput_samples_per_sec', 1) / 100
+                throughput = computational.get('throughput_samples_per_sec', 1)
+                efficiency_score = np.clip(throughput / 200, 0, 1)
+                
                 w = self.config['experiment_1c']['sweet_spot_weights']
                 combined = (w['downstream_performance'] * glue_score + w['structural_fidelity'] * tcm_score +
                             w['computational_efficiency'] * efficiency_score)
                 if combined > best_info['score']:
                     best_info = {'score': combined, 'key': key}
 
-            for key, info in sorted(model_results['variants'].items(), key=lambda item: item[1]['sparsity']):
+            for key, info in sorted(model_results['variants'].items(), key=lambda item: (item[1]['pruning_type'], item[1]['sparsity'])):
                 sparsity, ptype = info['sparsity'], info['pruning_type']
                 tcm = model_results['phase1_structural_fidelity'].get(key, {}).get('mean_tcm', -1)
                 glue = model_results['phase2_downstream_performance'].get(key, {}).get('average', -1)
                 latency = model_results['phase3_computational_performance'].get(key, {}).get('avg_latency_ms', -1)
-                self.logger.info(f"  {ptype} {sparsity:.0%}: TCM={tcm:.2f}, GLUE={glue:.3f}, Latency={latency:.1f}ms")
+                self.logger.info(f"  {ptype:<12} {sparsity:4.0%}: TCM={tcm:6.2f}, GLUE={glue:.3f}, Latency={latency:5.1f}ms")
             
             if best_info['key']:
-                self.logger.info(f"  => OPTIMAL: {best_info['key']} (Score: {best_info['score']:.3f})")
+                self.logger.info(f"  => OPTIMAL: {best_info['key']} (Combined Score: {best_info['score']:.3f})")
 
 def main():
     import argparse

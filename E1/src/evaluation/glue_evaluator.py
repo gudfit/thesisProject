@@ -1,4 +1,3 @@
-# src/evaluation/glue_evaluator.py
 import torch
 import numpy as np
 import logging
@@ -12,44 +11,16 @@ from transformers import (
     DataCollatorWithPadding,
 )
 from sklearn.metrics import accuracy_score, f1_score, matthews_corrcoef
+import tempfile
+import shutil
 
 class GLUEEvaluator:
     TASK_CONFIGS = {
-        "sst2": {
-            "dataset": "glue",
-            "subset": "sst2",
-            "num_labels": 2,
-            "metric": "accuracy",
-            "text_fields": ["sentence"],
-        },
-        "mrpc": {
-            "dataset": "glue",
-            "subset": "mrpc",
-            "num_labels": 2,
-            "metric": "f1",
-            "text_fields": ["sentence1", "sentence2"],
-        },
-        "rte": {
-            "dataset": "glue",
-            "subset": "rte",
-            "num_labels": 2,
-            "metric": "accuracy",
-            "text_fields": ["sentence1", "sentence2"],
-        },
-        "cola": {
-            "dataset": "glue",
-            "subset": "cola",
-            "num_labels": 2,
-            "metric": "matthews_correlation",
-            "text_fields": ["sentence"],
-        },
-        "qqp": {
-            "dataset": "glue",
-            "subset": "qqp",
-            "num_labels": 2,
-            "metric": "f1",
-            "text_fields": ["question1", "question2"],
-        },
+        "sst2": {"dataset": "glue", "subset": "sst2", "num_labels": 2, "metric": "accuracy", "text_fields": ["sentence"]},
+        "mrpc": {"dataset": "glue", "subset": "mrpc", "num_labels": 2, "metric": "f1", "text_fields": ["sentence1", "sentence2"]},
+        "rte": {"dataset": "glue", "subset": "rte", "num_labels": 2, "metric": "accuracy", "text_fields": ["sentence1", "sentence2"]},
+        "cola": {"dataset": "glue", "subset": "cola", "num_labels": 2, "metric": "matthews_correlation", "text_fields": ["sentence"]},
+        "qqp": {"dataset": "glue", "subset": "qqp", "num_labels": 2, "metric": "f1", "text_fields": ["question1", "question2"]},
     }
 
     def __init__(self, base_model_name: str, device: str = "cuda"):
@@ -72,15 +43,13 @@ class GLUEEvaluator:
         for task in tasks:
             self.logger.info(f"Evaluating on {task.upper()}...")
             try:
-                score = self.evaluate_single_task(
-                    model, task, train_samples, eval_samples, epochs
-                )
+                score = self.evaluate_single_task(model, task, train_samples, eval_samples, epochs)
                 results[task] = score
                 self.logger.info(f"{task.upper()} score: {score:.4f}")
             except Exception as e:
-                self.logger.error(f"Error evaluating {task}: {e}")
+                self.logger.error(f"Error evaluating {task}: {e}", exc_info=True)
                 results[task] = 0.0
-        results["average"] = float(np.mean(list(results.values())))
+        results["average"] = float(np.mean(list(results.values()))) if results else 0.0
         return results
 
     def evaluate_single_task(
@@ -94,66 +63,51 @@ class GLUEEvaluator:
         if task not in self.TASK_CONFIGS:
             raise ValueError(f"Unknown task: {task}")
         config = self.TASK_CONFIGS[task]
+        
+        from datasets import logging as dsets_logging
+        dsets_logging.set_verbosity_error()
+
         dataset = load_dataset(config["dataset"], config["subset"])
-        train_dataset = (
-            dataset["train"].shuffle(seed=42).select(range(min(train_samples, len(dataset["train"]))))
-        )
-        eval_dataset = (
-            dataset["validation"].shuffle(seed=42).select(range(min(eval_samples, len(dataset["validation"]))))
-        )
-        classifier = self._create_classifier_from_mlm(model, config["num_labels"])
+        train_dataset = dataset["train"].shuffle(seed=42).select(range(min(train_samples, len(dataset["train"]))))
+        eval_dataset = dataset["validation"].shuffle(seed=42).select(range(min(eval_samples, len(dataset["validation"]))))
+        
+        classifier = self._create_classifier_from_base(model, config["num_labels"])
 
         def preprocess_function(examples):
-            if len(config["text_fields"]) == 1:
-                return self.tokenizer(
-                    examples[config["text_fields"][0]],
-                    truncation=True,
-                    padding=True,
-                    max_length=128,
-                )
-            return self.tokenizer(
-                examples[config["text_fields"][0]],
-                examples[config["text_fields"][1]],
-                truncation=True,
-                padding=True,
-                max_length=128,
-            )
+            args = (examples[field] for field in config["text_fields"])
+            return self.tokenizer(*args, truncation=True, padding=True, max_length=128)
 
         tokenized_train = train_dataset.map(preprocess_function, batched=True)
         tokenized_eval = eval_dataset.map(preprocess_function, batched=True)
+        
         if "label" in tokenized_train.column_names:
             tokenized_train = tokenized_train.rename_column("label", "labels")
             tokenized_eval = tokenized_eval.rename_column("label", "labels")
         if tokenized_train.features["labels"].dtype != "int64":
-            tokenized_train = tokenized_train.cast_column("labels", Value("int64"))
-            tokenized_eval = tokenized_eval.cast_column("labels", Value("int64"))
+            features = tokenized_train.features.copy()
+            features["labels"] = Value("int64")
+            tokenized_train = tokenized_train.cast(features)
+            tokenized_eval = tokenized_eval.cast(features)
 
         training_args = TrainingArguments(
             output_dir=f"./tmp/{task}_eval",
             num_train_epochs=epochs,
             per_device_train_batch_size=16,
             per_device_eval_batch_size=32,
-            warmup_steps=100,
-            weight_decay=0.01,
-            logging_steps=50,
-            eval_strategy="epoch",
+            logging_strategy="no",
             save_strategy="no",
-            load_best_model_at_end=False,
             report_to="none",
-            remove_unused_columns=True,
+            disable_tqdm=True,
             fp16=torch.cuda.is_available(),
-            dataloader_num_workers=0,
         )
 
         def compute_metrics(eval_pred):
             predictions, labels = eval_pred
             predictions = np.argmax(predictions, axis=1)
-            if config["metric"] == "accuracy":
-                return {"eval_accuracy": accuracy_score(labels, predictions)}
-            if config["metric"] == "f1":
-                return {"eval_f1": f1_score(labels, predictions, average="binary")}
-            if config["metric"] == "matthews_correlation":
-                return {"eval_matthews_correlation": matthews_corrcoef(labels, predictions)}
+            metric_name = config["metric"]
+            if metric_name == "accuracy": return {"eval_accuracy": accuracy_score(labels, predictions)}
+            if metric_name == "f1": return {"eval_f1": f1_score(labels, predictions, average="binary")}
+            if metric_name == "matthews_correlation": return {"eval_matthews_correlation": matthews_corrcoef(labels, predictions)}
             return {}
 
         trainer = Trainer(
@@ -161,28 +115,30 @@ class GLUEEvaluator:
             args=training_args,
             train_dataset=tokenized_train,
             eval_dataset=tokenized_eval,
-            tokenizer=self.tokenizer,
             data_collator=DataCollatorWithPadding(self.tokenizer),
             compute_metrics=compute_metrics,
         )
+        
         trainer.train()
         eval_results = trainer.evaluate()
+        
         main_metric = f"eval_{config['metric']}"
         score = eval_results.get(main_metric, 0.0)
-        classifier.to("cpu")
+
         del classifier, trainer
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+            
         return float(score)
 
-    def _create_classifier_from_mlm(self, mlm_model: torch.nn.Module, num_labels: int) -> torch.nn.Module:
-        classifier = AutoModelForSequenceClassification.from_pretrained(
-            self.base_model_name, num_labels=num_labels
-        ).to(self.device)
-        try:
-            classifier.load_state_dict(mlm_model.state_dict(), strict=False)
-        except Exception:
-            pass
+    def _create_classifier_from_base(self, base_model: torch.nn.Module, num_labels: int) -> torch.nn.Module:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base_model.save_pretrained(temp_dir)
+            classifier = AutoModelForSequenceClassification.from_pretrained(
+                temp_dir,
+                num_labels=num_labels,
+            ).to(self.device)
+            
         return classifier
 
     def evaluate_data_efficiency(
@@ -200,12 +156,15 @@ class GLUEEvaluator:
                 model, task, train_samples=n_samples, eval_samples=500, epochs=5
             )
             results["scores"].append(score)
-        threshold = 0.8 * max(results["scores"])
+        
+        max_score = max(results["scores"]) if results["scores"] else 0
+        threshold = 0.8 * max_score
         min_samples_needed = None
         for n_samples, score in zip(sample_sizes, results["scores"]):
             if score >= threshold:
                 min_samples_needed = n_samples
                 break
+        
         results["min_samples_for_threshold"] = min_samples_needed
         results["threshold"] = threshold
         return results
