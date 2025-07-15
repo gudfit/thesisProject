@@ -51,9 +51,6 @@ class BaseCompressor(ABC):
         batch_size: int = 16,
     ):
         """Custom fine-tuning loop with epoch-wise reconstruction evaluation."""
-        
-        # --- THIS IS THE FIX ---
-        # Explicitly cast learning rate to float to prevent YAML parsing issues
         lr = float(learning_rate)
         
         class TextDataset(Dataset):
@@ -73,13 +70,12 @@ class BaseCompressor(ABC):
                     max_length=self.max_length,
                     return_tensors="pt",
                 )
-                # Squeeze to remove batch dimension
                 return {key: val.squeeze() for key, val in encoding.items()}
 
         train_dataset = TextDataset(train_texts, self.tokenizer)
         train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size)
         
-        optimizer = AdamW(self.model.parameters(), lr=lr) # Use the corrected float value
+        optimizer = AdamW(self.model.parameters(), lr=lr) 
         num_training_steps = epochs * len(train_dataloader)
         lr_scheduler = get_scheduler(
             name="linear", optimizer=optimizer, num_warmup_steps=100, num_training_steps=num_training_steps
