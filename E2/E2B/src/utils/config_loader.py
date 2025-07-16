@@ -62,6 +62,7 @@ class PruningConfig(ExperimentConfig):
     pruning_amounts: List[float] = field(default_factory=lambda: [0.2, 0.4, 0.6, 0.8])
     pruned_models_dir: str = "./pruned_models"
     finetuned_base_path: str = ""
+    max_samples: int = 1000
 
 @dataclass
 class QuantizationExperimentConfig(ExperimentConfig):
@@ -123,6 +124,7 @@ class ConfigLoader:
             pruning_amounts=data.get("pruning_amounts", [0.2, 0.4, 0.6, 0.8]),
             pruned_models_dir=data.get("pruned_models_dir", "./pruned_models"),
             finetuned_base_path=data.get("finetuned_base_path", ""),
+            max_samples=data.get("max_samples", 1000),
         )
 
     @staticmethod

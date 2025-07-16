@@ -1,0 +1,20 @@
+COMPREHENSIVE COMPRESSION METHOD ANALYSIS REPORT
+================================================================================
+
+OVERALL STATISTICS
+----------------------------------------
+                   semantic_similarity              retrieval_cost_ms                storage_cost_bytes is_semantically_equivalent
+                                  mean     std  max              mean       std  min               mean                       mean
+compression_method                                                                                                                
+advanced_pruning                0.6988  0.2874  1.0          520.6808  574.2349  0.0       1.112208e+09                     0.3316
+fine_tuning                     0.7598  0.2594  1.0          350.0827  408.5464  0.0       8.511290e+08                     0.3792
+quantization                    0.7316  0.2719  1.0          382.2311  439.7731  0.0       3.983761e+08                     0.3560
+
+BEST CONFIGURATIONS BY METRIC
+----------------------------------------
+Best Semantic Similarity: Cerebras-111M (fine_tuning) - 1.0000
+Fastest Retrieval: Cerebras-111M (fine_tuning) - 0.00ms
+Smallest Storage: Cerebras-111M_b8_s50 (quantization) - 0.227GB
+
+================================================================================
+Analysis complete. See visualizations for detailed comparisons.

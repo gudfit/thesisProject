@@ -20,6 +20,7 @@ setup(
         "pyyaml>=6.0",
         "tqdm>=4.65.0",
         "scipy>=1.10.0",
+        "pip",
     ],
     extras_require={
         "dev": [
