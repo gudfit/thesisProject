@@ -5,6 +5,8 @@ test_split: "validation"
 ood_dataset_name: "ag_news"
 ood_dataset_subset: "default"
 ood_split: "test"
+ood_hard_level: "mstr"
+ood_hard_k: 6
 
 lambda_budgets:
   - {name: "Cerebras-111M", model_id: "cerebras/Cerebras-GPT-111M"}

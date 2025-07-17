@@ -13,6 +13,7 @@ from ..models.model_utils import ModelManager
 from ..core.data_handler import DataHandler
 from ..core.reconstruction import SentenceReconstructor
 from ..core.metrics import MetricsCalculator
+from scripts.ood_hard_utils import mask_and_truncate,mask_shuffle_trunc
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,11 @@ class FinetuneExperiment(BaseExperiment):
         ood_sents = []
         if getattr(self.config,"ood_dataset_name",None):
             ood_sents = DataHandler.load_sentences(self.config.ood_dataset_name, self.config.ood_dataset_subset, self.config.ood_split, max_samples=getattr(self.config,"max_samples_ood",None) or getattr(self.config,"max_samples",100))
+            lvl = getattr(self.config,"ood_hard_level",None)
+            if lvl=="mask_trunc":
+                ood_sents = mask_and_truncate(ood_sents,getattr(self.config,"ood_hard_k",8))
+            elif lvl=="mstr":
+                ood_sents = mask_shuffle_trunc(ood_sents,getattr(self.config,"ood_hard_k",6))
         rows = []
         for cfg in self.config.lambda_budgets:
             safe_name = cfg.model_id.replace("/", "_")

@@ -15,6 +15,7 @@ from ..core.data_handler import DataHandler
 from ..core.reconstruction import SentenceReconstructor
 from ..core.metrics import MetricsCalculator
 from ..models.finetuning import ModelFineTuner
+from scripts.ood_hard_utils import mask_and_truncate,mask_shuffle_trunc
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +97,11 @@ class QuantizationExperiment(BaseExperiment):
         ood_sents = []
         if getattr(self.config,"ood_dataset_name",None):
             ood_sents = DataHandler.load_sentences(self.config.ood_dataset_name, self.config.ood_dataset_subset, self.config.ood_split, max_samples=getattr(self.config,"max_samples_ood",None) or self.config.max_samples)
+            lvl = getattr(self.config,"ood_hard_level",None)
+            if lvl=="mask_trunc":
+                ood_sents = mask_and_truncate(ood_sents,getattr(self.config,"ood_hard_k",8))
+            elif lvl=="mstr":
+                ood_sents = mask_shuffle_trunc(ood_sents,getattr(self.config,"ood_hard_k",6))
         all_results = []
         quantized_models_dir = Path(self.config.quantized_models_dir)
         for model_dir in quantized_models_dir.iterdir():
@@ -113,14 +119,10 @@ class QuantizationExperiment(BaseExperiment):
             sparsity = 1.0 - nonzero_params / total_params if total_params else 0.0
             parts = model_name.split('_')
             base_model = '_'.join(parts[:-2]) if len(parts) >= 3 else model_name
-            try:
-                bits = int(parts[-2][1:]) if len(parts) >= 2 and parts[-2].startswith('b') else None
-            except Exception:
-                bits = None
-            try:
-                sparsity_name = int(parts[-1][1:]) / 100 if len(parts) >= 1 and parts[-1].startswith('s') else None
-            except Exception:
-                sparsity_name = None
+            try:bits=int(parts[-2][1:]) if len(parts)>=2 and parts[-2].startswith('b') else None
+            except Exception:bits=None
+            try:sparsity_name=int(parts[-1][1:])/100 if len(parts)>=1 and parts[-1].startswith('s') else None
+            except Exception:sparsity_name=None
             all_results += self._eval_domain(model, tokenizer, id_sents, "id", self.config.semantic_threshold, model_name, storage_cost, total_params, nonzero_params, eff_bytes, sparsity, base_model, bits, sparsity_name)
             if ood_sents:
                 all_results += self._eval_domain(model, tokenizer, ood_sents, "ood", self.config.semantic_threshold_ood, model_name, storage_cost, total_params, nonzero_params, eff_bytes, sparsity, base_model, bits, sparsity_name)

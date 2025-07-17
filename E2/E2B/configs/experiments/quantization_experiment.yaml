@@ -5,6 +5,8 @@ test_split: "validation"
 ood_dataset_name: "ag_news"
 ood_dataset_subset: "default"
 ood_split: "test"
+ood_hard_level: "mstr"
+ood_hard_k: 6
 
 base_models:
   - {name: "GPT2-small", model_id: "gpt2"}
