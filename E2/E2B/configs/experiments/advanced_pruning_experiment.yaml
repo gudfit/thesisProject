@@ -2,6 +2,9 @@ experiment_name: "advanced_pruning_comparison"
 dataset_name: "wikitext"
 dataset_subset: "wikitext-2-raw-v1"
 test_split: "validation"
+ood_dataset_name: "ag_news"
+ood_dataset_subset: "default"
+ood_split: "test"
 
 base_models:
   - {name: "GPT2-small", model_id: "gpt2"}
@@ -10,13 +13,13 @@ base_models:
 pruning_configs:
   - method: "magnitude"
     structured: false
-    amounts: [0.2, 0.4, 0.6]
+    amounts: [0.2, 0.4, 0.6, 0.8, 0.9, 0.95]
   - method: "structured"
     structured: true
-    amounts: [0.2, 0.4, 0.6]
+    amounts: [0.2, 0.4, 0.6, 0.8, 0.9, 0.95]
   - method: "block_sparse"
     block_size: 4
-    amounts: [0.2, 0.4, 0.6]
+    amounts: [0.2, 0.4, 0.6, 0.8, 0.9, 0.95]
 
 finetuned_models_dir: "./models/finetuned"
 pruned_models_dir: "./models/advanced_pruned"
@@ -25,4 +28,7 @@ output_dir: "./results"
 theta_budgets: [5, 10, 20, 40, 100]
 num_repetitions: 1
 semantic_threshold: 0.95
+semantic_threshold_ood: 0.85
 max_samples: 100
+max_samples_ood: 100
+

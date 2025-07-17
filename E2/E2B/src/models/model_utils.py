@@ -1,18 +1,16 @@
+# src/models/model_utils.py
 import torch
 import os
 from pathlib import Path
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import logging
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict
 
 logger = logging.getLogger(__name__)
 
-
 class ModelManager:
     @staticmethod
-    def load_model_and_tokenizer(
-        model_path: str, device: Optional[str] = None
-    ) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
+    def load_model_and_tokenizer(model_path: str, device: Optional[str] = None) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
         logger.info(f"Loading model from {model_path} to {device}")
@@ -37,6 +35,23 @@ class ModelManager:
         return total_size
 
     @staticmethod
+    def count_nonzero_and_total_params(model) -> Dict[str, int]:
+        total = 0
+        nonzero = 0
+        effective_bytes = 0
+        for p in model.parameters():
+            n = p.numel()
+            nz = int(torch.count_nonzero(p).item())
+            total += n
+            nonzero += nz
+            effective_bytes += nz * p.element_size()
+        return {
+            "total_params": total,
+            "nonzero_params": nonzero,
+            "effective_param_bytes": effective_bytes,
+        }
+
+    @staticmethod
     def count_nonzero_params(model) -> int:
         return sum(torch.sum(p != 0).item() for p in model.parameters())
 
@@ -45,3 +60,4 @@ class ModelManager:
         del model, tokenizer
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+

@@ -2,6 +2,9 @@ experiment_name: "multi_model_finetune_comparison"
 dataset_name: "wikitext"
 dataset_subset: "wikitext-2-raw-v1"
 test_split: "validation"
+ood_dataset_name: "ag_news"
+ood_dataset_subset: "default"
+ood_split: "test"
 
 lambda_budgets:
   - {name: "Cerebras-111M", model_id: "cerebras/Cerebras-GPT-111M"}
@@ -21,4 +24,7 @@ training_args:
 theta_budgets: [5, 10, 20, 40, 60, 100]
 num_repetitions: 1
 semantic_threshold: 0.95
-max_samples: 100 
+semantic_threshold_ood: 0.85
+max_samples: 100
+max_samples_ood: 100
+
