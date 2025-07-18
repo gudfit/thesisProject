@@ -1,0 +1,497 @@
+{
+  "bert-base-uncased_predictive_masking": {
+    "0.1": {
+      "compression_ratio": 1.088389225091045,
+      "word_accuracy": 0.750830462856632,
+      "character_accuracy": 0.24792413064573768,
+      "semantic_similarity": 0.9998594796657563,
+      "rouge1_fmeasure": 0.9981651086932425,
+      "rouge2_fmeasure": 0.9964572270426203,
+      "rougeL_fmeasure": 0.9981651086932425,
+      "bert_score_f1": 0.9172373968362808,
+      "bits_per_character": 7.634144598024222
+    },
+    "0.2": {
+      "compression_ratio": 1.2186352572424513,
+      "word_accuracy": 0.746208700341239,
+      "character_accuracy": 0.23927365522820485,
+      "semantic_similarity": 0.9967992514371872,
+      "rouge1_fmeasure": 0.9901405221982819,
+      "rouge2_fmeasure": 0.9792598587303435,
+      "rougeL_fmeasure": 0.9901405221982819,
+      "bert_score_f1": 0.9154381877183915,
+      "bits_per_character": 6.817557146863123
+    },
+    "0.3": {
+      "compression_ratio": 1.375158729175715,
+      "word_accuracy": 0.7338269645376738,
+      "character_accuracy": 0.22804820737038786,
+      "semantic_similarity": 0.9877652370929718,
+      "rouge1_fmeasure": 0.9738901259847108,
+      "rouge2_fmeasure": 0.9429610250801607,
+      "rougeL_fmeasure": 0.9727109272243026,
+      "bert_score_f1": 0.9119542443752289,
+      "bits_per_character": 6.042686398752899
+    },
+    "0.4": {
+      "compression_ratio": 1.5881751040009626,
+      "word_accuracy": 0.7107988717015445,
+      "character_accuracy": 0.18957960373931218,
+      "semantic_similarity": 0.9710400527715684,
+      "rouge1_fmeasure": 0.9348869238220532,
+      "rouge2_fmeasure": 0.8684929697493715,
+      "rougeL_fmeasure": 0.9307212021564046,
+      "bert_score_f1": 0.9051883804798126,
+      "bits_per_character": 5.23034172396107
+    },
+    "0.5": {
+      "compression_ratio": 1.8791392175938817,
+      "word_accuracy": 0.6635105567950275,
+      "character_accuracy": 0.16012771367243286,
+      "semantic_similarity": 0.9280810451507568,
+      "rouge1_fmeasure": 0.859301015571331,
+      "rouge2_fmeasure": 0.7285472303536982,
+      "rougeL_fmeasure": 0.8451135330872473,
+      "bert_score_f1": 0.8965681958198547,
+      "bits_per_character": 4.424019425541934
+    },
+    "0.6": {
+      "compression_ratio": 2.2866862781790083,
+      "word_accuracy": 0.5927380291449226,
+      "character_accuracy": 0.14289355877886603,
+      "semantic_similarity": 0.84035331428051,
+      "rouge1_fmeasure": 0.7445479747599295,
+      "rouge2_fmeasure": 0.5424733515139366,
+      "rougeL_fmeasure": 0.7152780885313228,
+      "bert_score_f1": 0.8826607209444046,
+      "bits_per_character": 3.638220942200295
+    },
+    "0.7": {
+      "compression_ratio": 2.9159889400591323,
+      "word_accuracy": 0.5052999820907398,
+      "character_accuracy": 0.12178465761439199,
+      "semantic_similarity": 0.7553687554597854,
+      "rouge1_fmeasure": 0.6275904241527125,
+      "rouge2_fmeasure": 0.39015531613554344,
+      "rougeL_fmeasure": 0.5844288834155347,
+      "bert_score_f1": 0.8685050255060196,
+      "bits_per_character": 2.856583720476037
+    },
+    "0.8": {
+      "compression_ratio": 4.074059257427333,
+      "word_accuracy": 0.3976335206692109,
+      "character_accuracy": 0.10072497461997006,
+      "semantic_similarity": 0.6107425993680954,
+      "rouge1_fmeasure": 0.4894807253248176,
+      "rouge2_fmeasure": 0.2217504983234069,
+      "rougeL_fmeasure": 0.4344502435611372,
+      "bert_score_f1": 0.8483124572038651,
+      "bits_per_character": 2.0510055192982417
+    },
+    "0.9": {
+      "compression_ratio": 6.712053988147028,
+      "word_accuracy": 0.280949284230804,
+      "character_accuracy": 0.08958187720274126,
+      "semantic_similarity": 0.4094188799802214,
+      "rouge1_fmeasure": 0.3455572939029524,
+      "rouge2_fmeasure": 0.09804366947011652,
+      "rougeL_fmeasure": 0.2872837327814972,
+      "bert_score_f1": 0.8261694860458374,
+      "bits_per_character": 1.2626255212047135
+    }
+  },
+  "bert-base-uncased_lsq": {
+    "16": {
+      "compression_ratio": 0.0026130143258636333,
+      "word_accuracy": 0.5668651645523728,
+      "character_accuracy": 0.13637682729885944,
+      "semantic_similarity": 0.7288052651286125,
+      "rouge1_fmeasure": 0.7615107696657692,
+      "rouge2_fmeasure": 0.5906206239007207,
+      "rougeL_fmeasure": 0.7603128227038904,
+      "bert_score_f1": 0.8833712983131409,
+      "bits_per_character": 3180.7536010043254,
+      "quantization_bits": 16
+    },
+    "8": {
+      "compression_ratio": 0.005225493425996236,
+      "word_accuracy": 0.5672574722446805,
+      "character_accuracy": 0.13801839176527683,
+      "semantic_similarity": 0.7275534325838089,
+      "rouge1_fmeasure": 0.7620784841496906,
+      "rouge2_fmeasure": 0.5914181769874667,
+      "rougeL_fmeasure": 0.7608805371878118,
+      "bert_score_f1": 0.883591433763504,
+      "bits_per_character": 1590.536980815702,
+      "quantization_bits": 8
+    },
+    "4": {
+      "compression_ratio": 0.010448846793872242,
+      "word_accuracy": 0.5493688921888848,
+      "character_accuracy": 0.1346082278273915,
+      "semantic_similarity": 0.7207672309875488,
+      "rouge1_fmeasure": 0.7436443289699435,
+      "rouge2_fmeasure": 0.5607487947604993,
+      "rougeL_fmeasure": 0.7415322479043028,
+      "bert_score_f1": 0.8778636217117309,
+      "bits_per_character": 795.428670721391,
+      "quantization_bits": 4
+    }
+  },
+  "bert-base-uncased_vq": {
+    "128": {
+      "compression_ratio": 4.587429904118202,
+      "word_accuracy": 0.2233805514661299,
+      "character_accuracy": 0.08390535876250288,
+      "semantic_similarity": 0.33066225051879883,
+      "rouge1_fmeasure": 0.3386019933139534,
+      "rouge2_fmeasure": 0.11704094155970242,
+      "rougeL_fmeasure": 0.3352699665506835,
+      "bert_score_f1": 0.7925783163309097,
+      "bits_per_character": 1.8117702378451106,
+      "codebook_size": 128
+    },
+    "256": {
+      "compression_ratio": 4.0140011661034265,
+      "word_accuracy": 0.24883162460499006,
+      "character_accuracy": 0.07620913097428775,
+      "semantic_similarity": 0.3743052012100816,
+      "rouge1_fmeasure": 0.38022248026853356,
+      "rouge2_fmeasure": 0.14524592141962545,
+      "rougeL_fmeasure": 0.37395120109192553,
+      "bert_score_f1": 0.8030581480264664,
+      "bits_per_character": 2.070594557537269,
+      "codebook_size": 256
+    }
+  },
+  "roberta-base_predictive_masking": {
+    "0.1": {
+      "compression_ratio": 1.1777868195410053,
+      "word_accuracy": 0.9204618319304662,
+      "character_accuracy": 0.35231338565408327,
+      "semantic_similarity": 0.9021434566378593,
+      "rouge1_fmeasure": 0.9383296073615744,
+      "rouge2_fmeasure": 0.8613555250577203,
+      "rougeL_fmeasure": 0.9383296073615744,
+      "bert_score_f1": 0.971365025639534,
+      "bits_per_character": 6.91712412141241
+    },
+    "0.2": {
+      "compression_ratio": 1.3066779621126665,
+      "word_accuracy": 0.9052141022457053,
+      "character_accuracy": 0.32106738348715025,
+      "semantic_similarity": 0.8942289581894874,
+      "rouge1_fmeasure": 0.91807314098193,
+      "rouge2_fmeasure": 0.8294471576779633,
+      "rougeL_fmeasure": 0.9178509187597078,
+      "bert_score_f1": 0.9665296816825867,
+      "bits_per_character": 6.241707357285784
+    },
+    "0.3": {
+      "compression_ratio": 1.4616730726440705,
+      "word_accuracy": 0.8762649369640327,
+      "character_accuracy": 0.30065996599461176,
+      "semantic_similarity": 0.8779156348109245,
+      "rouge1_fmeasure": 0.8919754443207772,
+      "rouge2_fmeasure": 0.7776450063844874,
+      "rougeL_fmeasure": 0.8876500710790874,
+      "bert_score_f1": 0.9602920299768448,
+      "bits_per_character": 5.588840652089592
+    },
+    "0.4": {
+      "compression_ratio": 1.66688606312214,
+      "word_accuracy": 0.8211631033996402,
+      "character_accuracy": 0.21564052799814834,
+      "semantic_similarity": 0.8478200849890709,
+      "rouge1_fmeasure": 0.8367063662158101,
+      "rouge2_fmeasure": 0.6921423511271628,
+      "rougeL_fmeasure": 0.831036441945721,
+      "bert_score_f1": 0.949290629029274,
+      "bits_per_character": 4.91605085344798
+    },
+    "0.5": {
+      "compression_ratio": 1.9427807382606388,
+      "word_accuracy": 0.7428385077277829,
+      "character_accuracy": 0.1594168528123615,
+      "semantic_similarity": 0.8007846692204476,
+      "rouge1_fmeasure": 0.7505506256253698,
+      "rouge2_fmeasure": 0.5548639891988649,
+      "rougeL_fmeasure": 0.7368836744521288,
+      "bert_score_f1": 0.9311423653364181,
+      "bits_per_character": 4.231965719159854
+    },
+    "0.6": {
+      "compression_ratio": 2.302067842911826,
+      "word_accuracy": 0.6523196505865624,
+      "character_accuracy": 0.1210780672243892,
+      "semantic_similarity": 0.740549690425396,
+      "rouge1_fmeasure": 0.6564414877170777,
+      "rouge2_fmeasure": 0.4189584531411031,
+      "rougeL_fmeasure": 0.6318548244206464,
+      "bert_score_f1": 0.9118061822652817,
+      "bits_per_character": 3.5853386375729097
+    },
+    "0.7": {
+      "compression_ratio": 2.8497888856923446,
+      "word_accuracy": 0.5467692352524444,
+      "character_accuracy": 0.09630603948938217,
+      "semantic_similarity": 0.6510290336608887,
+      "rouge1_fmeasure": 0.5458042800251414,
+      "rouge2_fmeasure": 0.26415062410968687,
+      "rougeL_fmeasure": 0.4982402809345831,
+      "bert_score_f1": 0.8886419057846069,
+      "bits_per_character": 2.93005921532205
+    },
+    "0.8": {
+      "compression_ratio": 3.749379332714603,
+      "word_accuracy": 0.4298379555023521,
+      "character_accuracy": 0.0844054634689075,
+      "semantic_similarity": 0.5172830311954022,
+      "rouge1_fmeasure": 0.41838111057350474,
+      "rouge2_fmeasure": 0.14528602571293928,
+      "rougeL_fmeasure": 0.3625261671266764,
+      "bert_score_f1": 0.8618684196472168,
+      "bits_per_character": 2.2596821337351063
+    },
+    "0.9": {
+      "compression_ratio": 5.516656768496742,
+      "word_accuracy": 0.30834196417642273,
+      "character_accuracy": 0.07190927219394656,
+      "semantic_similarity": 0.35605556109920145,
+      "rouge1_fmeasure": 0.2892147441532714,
+      "rouge2_fmeasure": 0.058024084452830714,
+      "rougeL_fmeasure": 0.24162028466251967,
+      "bert_score_f1": 0.8336441415548325,
+      "bits_per_character": 1.6017757459992321
+    }
+  },
+  "roberta-base_lsq": {
+    "16": {
+      "compression_ratio": 0.002850427521393242,
+      "word_accuracy": 0.7469977267494212,
+      "character_accuracy": 0.14439363956834442,
+      "semantic_similarity": 0.5829088912904262,
+      "rouge1_fmeasure": 0.7414543545573626,
+      "rouge2_fmeasure": 0.5501174302007692,
+      "rougeL_fmeasure": 0.7411946142976223,
+      "bert_score_f1": 0.9246453392505646,
+      "bits_per_character": 2853.4352021790937,
+      "quantization_bits": 16
+    },
+    "8": {
+      "compression_ratio": 0.005700232952040014,
+      "word_accuracy": 0.7455769777229497,
+      "character_accuracy": 0.15087150284530826,
+      "semantic_similarity": 0.5821865928173066,
+      "rouge1_fmeasure": 0.7395796474995247,
+      "rouge2_fmeasure": 0.5462099833111759,
+      "rougeL_fmeasure": 0.7393199072397845,
+      "bert_score_f1": 0.9240495419502258,
+      "bits_per_character": 1426.8777814030868,
+      "quantization_bits": 8
+    },
+    "4": {
+      "compression_ratio": 0.01139797855830254,
+      "word_accuracy": 0.49272522957744336,
+      "character_accuracy": 0.07651274036283669,
+      "semantic_similarity": 0.3132226010039449,
+      "rouge1_fmeasure": 0.4602863857902529,
+      "rouge2_fmeasure": 0.24185996235164026,
+      "rougeL_fmeasure": 0.454161073388924,
+      "bert_score_f1": 0.8551539295911789,
+      "bits_per_character": 713.5990710150832,
+      "quantization_bits": 4
+    }
+  },
+  "roberta-base_vq": {
+    "128": {
+      "compression_ratio": 5.004268078690372,
+      "word_accuracy": 0.3976831665602721,
+      "character_accuracy": 0.07009419748014385,
+      "semantic_similarity": 0.18920384671539067,
+      "rouge1_fmeasure": 0.32837269484309567,
+      "rouge2_fmeasure": 0.08172718662072379,
+      "rougeL_fmeasure": 0.3253256032275204,
+      "bert_score_f1": 0.8285465031862259,
+      "bits_per_character": 1.6253095614309978,
+      "codebook_size": 128
+    },
+    "256": {
+      "compression_ratio": 4.378734568854076,
+      "word_accuracy": 0.42044419391110144,
+      "character_accuracy": 0.0864491375304879,
+      "semantic_similarity": 0.2131095151603222,
+      "rouge1_fmeasure": 0.35126309248966936,
+      "rouge2_fmeasure": 0.09900039588777247,
+      "rougeL_fmeasure": 0.3484905465577422,
+      "bert_score_f1": 0.8416597676277161,
+      "bits_per_character": 1.857496641635426,
+      "codebook_size": 256
+    }
+  },
+  "distilbert-base-uncased_predictive_masking": {
+    "0.1": {
+      "compression_ratio": 1.088389225091045,
+      "word_accuracy": 0.7498750322066353,
+      "character_accuracy": 0.23232059556533638,
+      "semantic_similarity": 0.997646437883377,
+      "rouge1_fmeasure": 0.9956387734523428,
+      "rouge2_fmeasure": 0.988557807018407,
+      "rougeL_fmeasure": 0.9956387734523428,
+      "bert_score_f1": 0.9157938420772552,
+      "bits_per_character": 7.634144598024222
+    },
+    "0.2": {
+      "compression_ratio": 1.2186352572424513,
+      "word_accuracy": 0.7477432495723957,
+      "character_accuracy": 0.23059317813486552,
+      "semantic_similarity": 0.9951624900102616,
+      "rouge1_fmeasure": 0.9892424462996753,
+      "rouge2_fmeasure": 0.971775147439701,
+      "rougeL_fmeasure": 0.9885207386962475,
+      "bert_score_f1": 0.9140357995033264,
+      "bits_per_character": 6.817557146863123
+    },
+    "0.3": {
+      "compression_ratio": 1.375158729175715,
+      "word_accuracy": 0.7330714709041338,
+      "character_accuracy": 0.21314058712916165,
+      "semantic_similarity": 0.98393197119236,
+      "rouge1_fmeasure": 0.9678195838287685,
+      "rouge2_fmeasure": 0.9237800287221567,
+      "rougeL_fmeasure": 0.9656980187750479,
+      "bert_score_f1": 0.9091913378238679,
+      "bits_per_character": 6.042686398752899
+    },
+    "0.4": {
+      "compression_ratio": 1.5881751040009626,
+      "word_accuracy": 0.7004113027492801,
+      "character_accuracy": 0.16465151747490755,
+      "semantic_similarity": 0.9517191863059997,
+      "rouge1_fmeasure": 0.9132129917489803,
+      "rouge2_fmeasure": 0.8205734882225176,
+      "rougeL_fmeasure": 0.9070994362294544,
+      "bert_score_f1": 0.9022472161054611,
+      "bits_per_character": 5.23034172396107
+    },
+    "0.5": {
+      "compression_ratio": 1.8791392175938817,
+      "word_accuracy": 0.6541540040129316,
+      "character_accuracy": 0.1543525541122165,
+      "semantic_similarity": 0.8884071618318558,
+      "rouge1_fmeasure": 0.8250881321667294,
+      "rouge2_fmeasure": 0.6666749198901889,
+      "rougeL_fmeasure": 0.8063654803538657,
+      "bert_score_f1": 0.89281274497509,
+      "bits_per_character": 4.424019425541934
+    },
+    "0.6": {
+      "compression_ratio": 2.2866862781790083,
+      "word_accuracy": 0.5906595536824486,
+      "character_accuracy": 0.12632375892034592,
+      "semantic_similarity": 0.7996828997135162,
+      "rouge1_fmeasure": 0.7161543575857178,
+      "rouge2_fmeasure": 0.5034762770217068,
+      "rougeL_fmeasure": 0.6856774995497525,
+      "bert_score_f1": 0.8821266329288483,
+      "bits_per_character": 3.638220942200295
+    },
+    "0.7": {
+      "compression_ratio": 2.9159889400591323,
+      "word_accuracy": 0.5159977109130104,
+      "character_accuracy": 0.10948100568051178,
+      "semantic_similarity": 0.7019911193847657,
+      "rouge1_fmeasure": 0.6194015233294595,
+      "rouge2_fmeasure": 0.3665973075799825,
+      "rougeL_fmeasure": 0.5755133107229711,
+      "bert_score_f1": 0.8689381349086761,
+      "bits_per_character": 2.856583720476037
+    },
+    "0.8": {
+      "compression_ratio": 4.074059257427333,
+      "word_accuracy": 0.3953601741073502,
+      "character_accuracy": 0.09871990286904139,
+      "semantic_similarity": 0.5841005302965641,
+      "rouge1_fmeasure": 0.5030633545016154,
+      "rouge2_fmeasure": 0.22924568710536472,
+      "rougeL_fmeasure": 0.4449124367634051,
+      "bert_score_f1": 0.8477577221393585,
+      "bits_per_character": 2.0510055192982417
+    },
+    "0.9": {
+      "compression_ratio": 6.712053988147028,
+      "word_accuracy": 0.2656601160418347,
+      "character_accuracy": 0.09209176188758392,
+      "semantic_similarity": 0.4286293822526932,
+      "rouge1_fmeasure": 0.37341306247030415,
+      "rouge2_fmeasure": 0.11094021278530895,
+      "rougeL_fmeasure": 0.3183040524387455,
+      "bert_score_f1": 0.821064904332161,
+      "bits_per_character": 1.2626255212047135
+    }
+  },
+  "distilbert-base-uncased_lsq": {
+    "16": {
+      "compression_ratio": 0.0026130143258636333,
+      "word_accuracy": 0.5942328270891367,
+      "character_accuracy": 0.14980182054282104,
+      "semantic_similarity": 0.7744397521018982,
+      "rouge1_fmeasure": 0.7980630380365303,
+      "rouge2_fmeasure": 0.6425205896689785,
+      "rougeL_fmeasure": 0.7969175193040552,
+      "bert_score_f1": 0.8886182457208633,
+      "bits_per_character": 3180.7536010043254,
+      "quantization_bits": 16
+    },
+    "8": {
+      "compression_ratio": 0.005225493425996236,
+      "word_accuracy": 0.5925547166553006,
+      "character_accuracy": 0.14265563378312587,
+      "semantic_similarity": 0.7728452575206757,
+      "rouge1_fmeasure": 0.7973248432678984,
+      "rouge2_fmeasure": 0.6411941127251606,
+      "rougeL_fmeasure": 0.7964015467576453,
+      "bert_score_f1": 0.8884721046686173,
+      "bits_per_character": 1590.536980815702,
+      "quantization_bits": 8
+    },
+    "4": {
+      "compression_ratio": 0.010448846793872242,
+      "word_accuracy": 0.5705827695672815,
+      "character_accuracy": 0.12636223999576943,
+      "semantic_similarity": 0.7437683263421059,
+      "rouge1_fmeasure": 0.770132261760174,
+      "rouge2_fmeasure": 0.5948355314777113,
+      "rougeL_fmeasure": 0.7693891129435774,
+      "bert_score_f1": 0.8820245051383973,
+      "bits_per_character": 795.428670721391,
+      "quantization_bits": 4
+    }
+  },
+  "distilbert-base-uncased_vq": {
+    "128": {
+      "compression_ratio": 4.587429904118202,
+      "word_accuracy": 0.2273125433757089,
+      "character_accuracy": 0.08235711896968839,
+      "semantic_similarity": 0.3253039626777172,
+      "rouge1_fmeasure": 0.3255901466215245,
+      "rouge2_fmeasure": 0.10998465440046708,
+      "rougeL_fmeasure": 0.3216432733998718,
+      "bert_score_f1": 0.7896933495998383,
+      "bits_per_character": 1.8117702378451106,
+      "codebook_size": 128
+    },
+    "256": {
+      "compression_ratio": 4.0140011661034265,
+      "word_accuracy": 0.27000110581545594,
+      "character_accuracy": 0.08577700646251235,
+      "semantic_similarity": 0.3909322388470173,
+      "rouge1_fmeasure": 0.37435661426586525,
+      "rouge2_fmeasure": 0.14188386719525659,
+      "rougeL_fmeasure": 0.3715445853601836,
+      "bert_score_f1": 0.805061399936676,
+      "bits_per_character": 2.070594557537269,
+      "codebook_size": 256
+    }
+  }
+}

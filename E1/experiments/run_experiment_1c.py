@@ -72,7 +72,7 @@ class Experiment1CRunner:
 
         self._run_and_log_baselines(test_texts)
 
-        fidelity_methods = self.config['experiment_1c']['structural_fidelity'].get('method', ['direct_mlm'])
+        fidelity_methods = self.config['experiment_1c']['structural_fidelity'].get('method', ['predictive_masking'])
         if isinstance(fidelity_methods, str):
             fidelity_methods = [fidelity_methods]
 
