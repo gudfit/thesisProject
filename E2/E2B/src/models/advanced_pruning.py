@@ -1,3 +1,5 @@
+# src/models/advanced_pruning.py
+
 import torch
 import torch.nn as nn
 import torch.nn.utils.prune as prune
@@ -10,6 +12,11 @@ from dataclasses import dataclass
 import copy
 
 logger = logging.getLogger(__name__)
+
+try:
+    from transformers.models.gpt2.modeling_gpt2 import Conv1D as GPT2Conv1D
+except ImportError:
+    GPT2Conv1D = None
 
 @dataclass
 class PruningConfig:
@@ -31,6 +38,12 @@ class AdvancedPruner:
         for _, module in model.named_modules():
             if isinstance(module, (nn.Linear, nn.Conv2d)):
                 prunable_modules.append((module, "weight"))
+            elif GPT2Conv1D is not None and isinstance(module, GPT2Conv1D):
+                prunable_modules.append((module, "weight"))
+            else:
+                w = getattr(module, "weight", None)
+                if w is not None and hasattr(w, "dim") and w.dim() == 2:
+                    prunable_modules.append((module, "weight"))
         return prunable_modules
 
     def apply_magnitude_pruning(self, model, amount: float):
@@ -41,6 +54,10 @@ class AdvancedPruner:
                 if isinstance(module, nn.Linear):
                     prune.ln_structured(module, name=param_name, amount=amount, n=2, dim=0)
                 elif isinstance(module, nn.Conv2d):
+                    prune.ln_structured(module, name=param_name, amount=amount, n=2, dim=0)
+                elif GPT2Conv1D is not None and isinstance(module, GPT2Conv1D):
+                    prune.ln_structured(module, name=param_name, amount=amount, n=2, dim=0)
+                else:
                     prune.ln_structured(module, name=param_name, amount=amount, n=2, dim=0)
         else:
             prune.global_unstructured(parameters_to_prune, pruning_method=prune.L1Unstructured, amount=amount)
@@ -69,17 +86,24 @@ class AdvancedPruner:
     def apply_block_sparse_pruning(self, model, amount: float, block_size: int = 4):
         logger.info(f"Applying block-sparse pruning: {amount*100}% sparsity, block size {block_size}")
         for _, module in model.named_modules():
-            if isinstance(module, nn.Linear):
-                weight = module.weight.data
-                h, w = weight.shape
-                h_blocks = h // block_size
-                w_blocks = w // block_size
-                if h_blocks > 0 and w_blocks > 0:
-                    weight_blocks = weight[:h_blocks*block_size, :w_blocks*block_size].reshape(
-                        h_blocks, block_size, w_blocks, block_size
-                    ).permute(0, 2, 1, 3).reshape(h_blocks * w_blocks, block_size * block_size)
-                    block_importance = torch.norm(weight_blocks, dim=1)
-                    num_blocks_to_prune = int(len(block_importance) * amount)
+            use = False
+            if isinstance(module, nn.Linear): use = True
+            elif GPT2Conv1D is not None and isinstance(module, GPT2Conv1D): use = True
+            else:
+                w = getattr(module, "weight", None)
+                if w is not None and hasattr(w, "dim") and w.dim() == 2: use = True
+            if not use: continue
+            weight = module.weight.data
+            h, w = weight.shape
+            h_blocks = h // block_size
+            w_blocks = w // block_size
+            if h_blocks > 0 and w_blocks > 0:
+                weight_blocks = weight[:h_blocks*block_size, :w_blocks*block_size].reshape(
+                    h_blocks, block_size, w_blocks, block_size
+                ).permute(0, 2, 1, 3).reshape(h_blocks * w_blocks, block_size * block_size)
+                block_importance = torch.norm(weight_blocks, dim=1)
+                num_blocks_to_prune = int(len(block_importance) * amount)
+                if num_blocks_to_prune > 0:
                     _, prune_indices = torch.topk(block_importance, num_blocks_to_prune, largest=False)
                     weight_blocks[prune_indices] = 0
                     weight[:h_blocks*block_size, :w_blocks*block_size] = weight_blocks.reshape(

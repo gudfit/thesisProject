@@ -1,3 +1,5 @@
+# src/models/pruning.py
+
 import torch
 import torch.nn.utils.prune as prune
 from transformers import AutoModelForCausalLM
@@ -8,6 +10,10 @@ from typing import List, Tuple
 
 logger = logging.getLogger(__name__)
 
+try:
+    from transformers.models.gpt2.modeling_gpt2 import Conv1D as GPT2Conv1D
+except ImportError:
+    GPT2Conv1D = None
 
 class ModelPruner:
 
@@ -17,6 +23,12 @@ class ModelPruner:
         for name, module in model.named_modules():
             if isinstance(module, torch.nn.Linear):
                 parameters_to_prune.append((module, "weight"))
+            elif GPT2Conv1D is not None and isinstance(module, GPT2Conv1D):
+                parameters_to_prune.append((module, "weight"))
+            else:
+                w = getattr(module, "weight", None)
+                if w is not None and hasattr(w, "dim") and w.dim() == 2:
+                    parameters_to_prune.append((module, "weight"))
         if not parameters_to_prune:
             raise ValueError("No parameters found to prune in model")
         logger.info(f"Found {len(parameters_to_prune)} parameters to prune")
@@ -58,3 +70,4 @@ class ModelPruner:
             logger.info(f"Saved {amount*100:.0f}% pruned model")
             del pruned_model
         return pruned_models
+

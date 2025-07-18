@@ -18,6 +18,6 @@ theta_budgets: [5, 10, 20, 40, 100]
 num_repetitions: 3
 semantic_threshold: 0.95
 semantic_threshold_ood: 0.85
-max_samples: 500
-max_samples_ood: 500
+max_samples: 100
+max_samples_ood: 100
 
