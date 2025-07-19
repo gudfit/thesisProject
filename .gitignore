@@ -2,6 +2,9 @@
 __pycache__/
 *.py[codz]
 *$py.class
+E2/E2A/data/
+*.npy
+*.tar.gz
 
 # C extensions
 *.so
