@@ -38,16 +38,22 @@ class FinetuneExperiment(BaseExperiment):
         sparsity = np.where(counts["total_params"] > 0, 1.0 - counts["nonzero_params"] / counts["total_params"], 0.0)
         for s in tqdm(sentences, desc=f"{model_name} {domain}"):
             for theta in self.config.theta_budgets:
-                lats = [self.reconstructor.reconstruct_sentence(model, tok, s, theta)[1] for _ in range(self.config.num_repetitions)]
-                recon, _ = self.reconstructor.reconstruct_sentence(model, tok, s, theta)
+                lats = []
+                ppls = []
+                confs = []
+                for _ in range(self.config.num_repetitions):
+                    recon, lat, ppl, conf = self.reconstructor.reconstruct_sentence(model, tok, s, theta)
+                    lats.append(lat)
+                    ppls.append(ppl)
+                    confs.append(conf)
+                recon, _, _, _ = self.reconstructor.reconstruct_sentence(model, tok, s, theta)
                 sim = self.metrics.calculate_semantic_similarity(s, recon)
                 fact = self.metrics.calculate_factual_recall(s, recon)
                 lex = self.metrics.lexical_recall(s, recon)
-                succ_comp = 0.6*sim + 0.3*fact + 0.1*lex  # Heuristic: Weighted composite (configurable; emphasizes semantic)
+                succ_comp = 0.6*sim + 0.3*fact + 0.1*lex
                 rows.append(dict(
                     model_name=model_name,
                     eval_domain=domain,
-                    storage_cost_lambda=size_bytes,
                     storage_cost_bytes=size_bytes,
                     total_params=counts["total_params"],
                     nonzero_params=counts["nonzero_params"],
@@ -64,20 +70,22 @@ class FinetuneExperiment(BaseExperiment):
                     success_composite=succ_comp,
                     semantic_threshold_used=thresh,
                     is_semantically_equivalent=sim >= thresh,
+                    perplexity=np.mean(ppls),
+                    confidence=np.mean(confs),
                 ))
         return rows
 
     def run_experiment(self) -> pd.DataFrame:
-        id_sents = DataHandler.load_sentences(self.config.dataset_name, self.config.dataset_subset, self.config.test_split, max_samples=getattr(self.config,"max_samples",100))
+        id_sents = DataHandler.load_sentences(self.config.dataset_name, self.config.dataset_subset, self.config.test_split, max_samples=getattr(self.config,"max_samples",1000))
         ood_sents = []
         if getattr(self.config,"ood_dataset_name",None):
-            ood_sents = DataHandler.load_sentences(self.config.ood_dataset_name, self.config.ood_dataset_subset, self.config.ood_split, max_samples=getattr(self.config,"max_samples_ood",None) or getattr(self.config,"max_samples",100))
+            ood_sents = DataHandler.load_sentences(self.config.ood_dataset_name, self.config.ood_dataset_subset, self.config.ood_split, max_samples=getattr(self.config,"max_samples_ood",None) or getattr(self.config,"max_samples",1000))
             lvl = getattr(self.config,"ood_hard_level",None)
             if lvl=="mask_trunc":
                 ood_sents = mask_and_truncate(ood_sents,getattr(self.config,"ood_hard_k",8))
             elif lvl=="mstr":
                 ood_sents = mask_shuffle_trunc(ood_sents,getattr(self.config,"ood_hard_k",6))
-        rows = []
+        results = []
         for cfg in self.config.lambda_budgets:
             safe_name = cfg.model_id.replace("/", "_")
             model_dir = Path(self.config.finetune_output_dir) / safe_name
@@ -85,9 +93,8 @@ class FinetuneExperiment(BaseExperiment):
             model, tok = ModelManager.load_model_and_tokenizer(str(model_dir), device)
             size_bytes = ModelManager.get_model_size_on_disk(str(model_dir))
             counts = ModelManager.count_nonzero_and_total_params(model)
-            rows += self._eval_domain(model, tok, id_sents, "id", self.config.semantic_threshold, cfg.name, size_bytes, counts)
+            results += self._eval_domain(model, tok, id_sents, "id", self.config.semantic_threshold, cfg.name, size_bytes, counts)
             if ood_sents:
-                rows += self._eval_domain(model, tok, ood_sents, "ood", self.config.semantic_threshold_ood, cfg.name, size_bytes, counts)
+                results += self._eval_domain(model, tok, ood_sents, "ood", self.config.semantic_threshold_ood, cfg.name, size_bytes, counts)
             ModelManager.cleanup_model(model, tok)
-        return pd.DataFrame(rows)
-
+        return pd.DataFrame(results)

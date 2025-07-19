@@ -1,3 +1,5 @@
+# src/analysis/visualization.py
+
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
@@ -46,6 +48,8 @@ class ExperimentVisualizer:
             "DeepSeek": "#8c564b",
             "Phi": "#e377c2",
             "Gemma": "#7f7f7f",
+            "Huffman": "#bcbd22",
+            "LZW": "#17becf",
             "Other": "#17becf",
         }
 
@@ -108,7 +112,7 @@ class ExperimentVisualizer:
         plt.savefig(output_path)
         plt.close()
 
-    def plot_efficiency_scatter(self, efficiency_df: pd.DataFrame, output_path: Path):
+    def plot_efficiency_scatter(self, efficiency_df: pd.DataFrame, traditional_eirs: Dict[str, float], output_path: Path):
         fig, ax = plt.subplots(figsize=(10, 8))
 
         families = efficiency_df.index.map(self._extract_family)
@@ -118,8 +122,8 @@ class ExperimentVisualizer:
             family_data = efficiency_df[mask]
 
             ax.scatter(
-                family_data["storage_gb"],
-                family_data["success_rate"],
+                family_data["effective_param_gb"],
+                family_data["eir_success"],
                 label=family,
                 color=self.colors.get(family, self.colors["Other"]),
                 s=100,
@@ -127,10 +131,14 @@ class ExperimentVisualizer:
                 edgecolors="black",
             )
 
+        
+        for comp, eir in traditional_eirs.items():
+            ax.axhline(y=eir, color=self.colors.get(comp, self.colors["Other"]), linestyle='--', label=f'{comp} (Traditional)')
+
         ax.set_xlabel("Storage Cost (GB)", fontweight="bold")
-        ax.set_ylabel("Success Rate", fontweight="bold")
+        ax.set_ylabel("Effective Information Ratio (EIR)", fontweight="bold")
         ax.set_title(
-            "Model Efficiency: Performance vs Storage", fontweight="bold", pad=20
+            "Model Efficiency: EIR vs Storage (with Traditional Baselines)", fontweight="bold", pad=20
         )
         ax.legend()
         ax.grid(True, alpha=0.3)
@@ -157,3 +165,6 @@ class ExperimentVisualizer:
             if key in model_lower:
                 return family
         return "Other"
+
+
+

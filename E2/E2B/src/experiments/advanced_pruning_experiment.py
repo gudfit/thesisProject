@@ -1,5 +1,6 @@
 # src/experiments/advanced_pruning_experiment.py
 
+
 import pandas as pd
 from pathlib import Path
 import torch
@@ -50,14 +51,18 @@ class AdvancedPruningExperiment(BaseExperiment):
 
     def _eval_domain(self, model, tok, sents, domain, thresh, label, sid, meth, size, counts):
         rows = []
-        sparsity = 1.0 - counts["nonzero_params"] / counts["total_params"] if counts["total_params"] else 0.0
+        sparsity = np.where(counts["total_params"] > 0, 1.0 - counts["nonzero_params"] / counts["total_params"], 0.0)
         for sent in tqdm(sents, desc=f"{label} {domain}"):
             for theta in self.config.theta_budgets:
                 lats = []
+                ppls = []
+                confs = []
                 for _ in range(self.config.num_repetitions):
-                    _, lat = self.reconstructor.reconstruct_sentence(model, tok, sent, theta)
+                    recon, lat, ppl, conf = self.reconstructor.reconstruct_sentence(model, tok, sent, theta)
                     lats.append(lat)
-                recon, _ = self.reconstructor.reconstruct_sentence(model, tok, sent, theta)
+                    ppls.append(ppl)
+                    confs.append(conf)
+                recon, _, _, _ = self.reconstructor.reconstruct_sentence(model, tok, sent, theta)
                 sim = self.metrics.calculate_semantic_similarity(sent, recon)
                 fact = self.metrics.calculate_factual_recall(sent, recon)
                 lex = self.metrics.lexical_recall(sent, recon)
@@ -83,6 +88,8 @@ class AdvancedPruningExperiment(BaseExperiment):
                     success_composite=succ_comp,
                     semantic_threshold_used=thresh,
                     is_semantically_equivalent=sim >= thresh,
+                    perplexity=np.mean(ppls),
+                    confidence=np.mean(confs),
                 ))
         return rows
 
@@ -96,7 +103,7 @@ class AdvancedPruningExperiment(BaseExperiment):
                 ood_sents = mask_and_truncate(ood_sents, getattr(self.config, "ood_hard_k", 8))
             elif lvl == "mstr":
                 ood_sents = mask_shuffle_trunc(ood_sents, getattr(self.config, "ood_hard_k", 6))
-        rows: List[Dict] = []
+        rows = []
         device = "cuda" if torch.cuda.is_available() else "cpu"
         pruned_root = Path(self.config.pruned_models_dir)
         for base_dir in pruned_root.iterdir():
@@ -126,4 +133,3 @@ class AdvancedPruningExperiment(BaseExperiment):
                         rows += self._eval_domain(model, tok, ood_sents, "ood", self.config.semantic_threshold_ood, label, sid, meth_dir.name, size, counts)
                     ModelManager.cleanup_model(model, tok)
         return pd.DataFrame(rows)
-

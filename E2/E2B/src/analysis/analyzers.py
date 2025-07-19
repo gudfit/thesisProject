@@ -4,19 +4,26 @@ import pandas as pd
 import numpy as np
 from typing import Any, Optional
 import logging
+from scipy.optimize import curve_fit
+
+from ..core.data_handler import DataHandler
+from ..core.traditional_compressors import huffman_compress, lzw_compress
 
 logger = logging.getLogger(__name__)
+
+def capacity_scaling_law(N, Q_max, a, gamma):
+    return Q_max * (1 - a * np.power(N, -gamma))
 
 class ExperimentAnalyzer:
     def __init__(self, results_df: pd.DataFrame, config: Any):
         self.results_df = results_df
         self.config = config
         self._prepare_dataframe()
-    
+
     def _prepare_dataframe(self):
         df = self.results_df
         if "is_semantically_equivalent" not in df.columns and "semantic_similarity" in df.columns:
-        df["is_semantically_equivalent"] = df["semantic_similarity"] >= self.config.semantic_threshold
+            df["is_semantically_equivalent"] = df["semantic_similarity"] >= self.config.semantic_threshold
         if "sparsity" not in df.columns and "total_params" in df.columns and "nonzero_params" in df.columns:
             df["sparsity"] = np.where(df["total_params"] > 0, 1.0 - df["nonzero_params"] / df["total_params"], 0.0)
         if "success_composite" not in df.columns:
@@ -46,7 +53,6 @@ class ExperimentAnalyzer:
                     "nonzero_params": "first",
                     "effective_param_bytes": "first",
                     "sparsity": "first",
-                    "storage_cost_lambda": "first" if "storage_cost_lambda" in df.columns else "max",
                     "storage_cost_bytes": "first" if "storage_cost_bytes" in df.columns else "max",
                 }
             )
@@ -66,7 +72,6 @@ class ExperimentAnalyzer:
             "nonzero_params_first":"nonzero_params",
             "effective_param_bytes_first":"effective_param_bytes",
             "sparsity_first":"sparsity",
-            "storage_cost_lambda_first":"storage_cost_lambda",
             "storage_cost_bytes_first":"storage_cost_bytes",
         }
         summary = summary.rename(columns={k:v for k,v in m.items() if k in summary.columns})
@@ -100,21 +105,23 @@ class ExperimentAnalyzer:
         return out
 
 class FinetuneAnalyzer(ExperimentAnalyzer):
-    def compute_model_efficiency(self, domain: Optional[str] = None) -> pd.DataFrame:
+    def compute_model_efficiency(self, domain: Optional[str] = None, i_ref: Optional[float] = None) -> pd.DataFrame:
         summary = self.compute_summary_statistics(domain=domain)
+        if i_ref is None:
+            sentences = DataHandler.load_sentences(self.config.dataset_name, self.config.dataset_subset, self.config.test_split)
+            all_text = " ".join(sentences)
+            i_ref = len(all_text.encode('utf-8')) * 8  
         if "effective_param_gb" not in summary.columns:
-            if "storage_cost_lambda" in summary.columns:
-                summary["effective_param_gb"] = summary["storage_cost_lambda"]/1e9
-            elif "storage_cost_bytes" in summary.columns:
+            if "storage_cost_bytes" in summary.columns:
                 summary["effective_param_gb"] = summary["storage_cost_bytes"]/1e9
             else:
                 summary["effective_param_gb"] = np.nan
-        summary["success_per_gb"] = summary["success_rate"]/summary["effective_param_gb"]
-        summary["similarity_per_gb"] = summary["avg_similarity"]/summary["effective_param_gb"]
+        summary["eir_success"] = (i_ref * summary["success_rate"]) / summary["storage_cost_bytes"]
+        summary["eir_similarity"] = (i_ref * summary["avg_similarity"]) / summary["storage_cost_bytes"]
         if "param_millions" in summary.columns:
-            summary["success_per_paramM"] = summary["success_rate"]/summary["param_millions"]
-            summary["similarity_per_paramM"] = summary["avg_similarity"]/summary["param_millions"]
-            summary["successComp_per_paramM"] = summary["avg_success_composite"]/summary["param_millions"]
+            summary["eir_success_per_paramM"] = (i_ref * summary["success_rate"]) / (summary["param_millions"] * 1e6)
+            summary["eir_similarity_per_paramM"] = (i_ref * summary["avg_similarity"]) / (summary["param_millions"] * 1e6)
+            summary["eir_successComp_per_paramM"] = (i_ref * summary["avg_success_composite"]) / (summary["param_millions"] * 1e6)
         return summary
 
 class PruningAnalyzer(ExperimentAnalyzer):
@@ -132,4 +139,38 @@ class PruningAnalyzer(ExperimentAnalyzer):
             summary["relative_performance"] = np.nan
             summary["relative_comp_success"] = np.nan
         return summary.sort_values("sparsity")
+
+    def fit_scaling_law(self, df: pd.DataFrame, metric: str = "success_rate"):
+        families = df['model_name'].apply(lambda x: x.split('-')[0] if '-' in x else x)  
+        results = {}
+        for family in families.unique():
+            fam_df = df[families == family]
+            if len(fam_df) < 3:
+                continue  
+            N = fam_df['nonzero_params'].values / fam_df['total_params'].values[0]  
+            Q = fam_df[metric].values
+            try:
+                popt, _ = curve_fit(capacity_scaling_law, N, Q, p0=[1.0, 0.5, 0.5])
+                results[family] = {'Q_max': popt[0], 'a': popt[1], 'gamma': popt[2]}
+            except RuntimeError:
+                results[family] = {'Q_max': np.nan, 'a': np.nan, 'gamma': np.nan}
+        return results
+
+    def compute_traditional_eir(self, sentences: List[str]) -> Dict[str, float]:
+        traditional_eirs = {}
+
+        # Huffman
+        all_text = " ".join(sentences)
+        huff_compressed, _ = huffman_compress(all_text)
+        huff_size = len(huff_compressed.tobytes())
+        i_ref = len(all_text.encode('utf-8')) * 8  
+        traditional_eirs['Huffman'] = i_ref / huff_size  
+
+        # LZW
+        lzw_compressed = lzw_compress(all_text)
+        lzw_size = len(lzw_compressed) * 12 / 8  # Approx bytes (12-bit codes)
+        traditional_eirs['LZW'] = i_ref / lzw_size
+
+        return traditional_eirs
+
 

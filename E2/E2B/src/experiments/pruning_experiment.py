@@ -40,11 +40,15 @@ class PruningExperiment(BaseExperiment):
         sparsity = np.where(counts["total_params"] > 0, 1.0 - counts["nonzero_params"] / counts["total_params"], 0.0)
         for sent in tqdm(sentences, desc=f"{label} {domain}"):
             for theta in self.config.theta_budgets:
-                latencies = []
+                lats = []
+                ppls = []
+                confs = []
                 for _ in range(self.config.num_repetitions):
-                    recon, lat = self.reconstructor.reconstruct_sentence(model, tok, sent, theta)
-                    latencies.append(lat)
-                recon, _ = self.reconstructor.reconstruct_sentence(model, tok, sent, theta)
+                    recon, lat, ppl, conf = self.reconstructor.reconstruct_sentence(model, tok, sent, theta)
+                    lats.append(lat)
+                    ppls.append(ppl)
+                    confs.append(conf)
+                recon, _, _, _ = self.reconstructor.reconstruct_sentence(model, tok, sent, theta)
                 sim = self.metrics.calculate_semantic_similarity(sent, recon)
                 fact = self.metrics.calculate_factual_recall(sent, recon)
                 lex = self.metrics.lexical_recall(sent, recon)
@@ -58,7 +62,7 @@ class PruningExperiment(BaseExperiment):
                     effective_param_bytes=counts["effective_param_bytes"],
                     sparsity=sparsity,
                     prompt_len_theta=theta,
-                    retrieval_cost_ms=float(np.mean(latencies)),
+                    retrieval_cost_ms=float(np.mean(lats)),
                     original_sentence=sent,
                     reconstructed_sentence=recon,
                     is_perfect=self.metrics.is_perfect_match(sent, recon),
@@ -68,6 +72,8 @@ class PruningExperiment(BaseExperiment):
                     success_composite=succ_comp,
                     semantic_threshold_used=thresh,
                     is_semantically_equivalent=sim >= thresh,
+                    perplexity=np.mean(ppls),
+                    confidence=np.mean(confs),
                 ))
         return rows
 
