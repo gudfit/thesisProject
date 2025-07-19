@@ -44,6 +44,8 @@ class AdvancedPruner:
                 w = getattr(module, "weight", None)
                 if w is not None and hasattr(w, "dim") and w.dim() == 2:
                     prunable_modules.append((module, "weight"))
+        if not prunable_modules:
+            raise ValueError("No prunable layers (e.g., nn.Linear) found in model architecture")
         return prunable_modules
 
     def apply_magnitude_pruning(self, model, amount: float):

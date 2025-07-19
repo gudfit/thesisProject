@@ -12,16 +12,16 @@ class ExperimentAnalyzer:
         self.results_df = results_df
         self.config = config
         self._prepare_dataframe()
-
+    
     def _prepare_dataframe(self):
         df = self.results_df
         if "is_semantically_equivalent" not in df.columns and "semantic_similarity" in df.columns:
-            df["is_semantically_equivalent"] = df["semantic_similarity"] >= self.config.semantic_threshold
+        df["is_semantically_equivalent"] = df["semantic_similarity"] >= self.config.semantic_threshold
         if "sparsity" not in df.columns and "total_params" in df.columns and "nonzero_params" in df.columns:
-            df["sparsity"] = 1.0 - df["nonzero_params"] / df["total_params"]
+            df["sparsity"] = np.where(df["total_params"] > 0, 1.0 - df["nonzero_params"] / df["total_params"], 0.0)
         if "success_composite" not in df.columns:
-            if all(c in df.columns for c in ["semantic_similarity","factual_recall","lexical_recall"]):
-                df["success_composite"] = 0.6*df["semantic_similarity"] + 0.3*df["factual_recall"] + 0.1*df["lexical_recall"]
+            if all(c in df.columns for c in ["semantic_similarity", "factual_recall", "lexical_recall"]):
+                df["success_composite"] = 0.6 * df["semantic_similarity"] + 0.3 * df["factual_recall"] + 0.1 * df["lexical_recall"]
             else:
                 df["success_composite"] = df.get("semantic_similarity", pd.Series(np.nan, index=df.index))
         self.results_df = df

@@ -51,57 +51,18 @@ class QuantizationExperiment(BaseExperiment):
         quantizer = SparseGPTQuantizer(config)
         quantizer.quantize_model(str(model_path), str(output_path))
 
-    def _eval_domain(self, model, tokenizer, sentences, domain, thresh, model_name, storage_cost, total_params, nonzero_params, eff_bytes, sparsity, base_model, bits, sparsity_name):
-        rows = []
-        for sentence in tqdm(sentences, desc=f"{model_name} {domain}"):
-            for theta in self.config.theta_budgets:
-                latencies = []
-                for _ in range(self.config.num_repetitions):
-                    recon_text, latency = self.reconstructor.reconstruct_sentence(model, tokenizer, sentence, theta)
-                    latencies.append(latency)
-                avg_latency = np.mean(latencies)
-                recon_text, _ = self.reconstructor.reconstruct_sentence(model, tokenizer, sentence, theta)
-                is_perfect = self.metrics_calculator.is_perfect_match(sentence, recon_text)
-                sem_sim = self.metrics_calculator.calculate_semantic_similarity(sentence, recon_text)
-                fact = self.metrics_calculator.calculate_factual_recall(sentence, recon_text)
-                lex = self.metrics_calculator.lexical_recall(sentence, recon_text)
-                succ_comp = 0.6*sem_sim + 0.3*fact + 0.1*lex
-                is_sem_eq = sem_sim >= thresh
-                rows.append({
-                    'model_name': model_name,
-                    'base_model': base_model,
-                    'quantization_bits': bits,
-                    'sparsity': sparsity_name if sparsity_name is not None else sparsity,
-                    'eval_domain': domain,
-                    'storage_cost_bytes': storage_cost,
-                    'total_params': total_params,
-                    'nonzero_params': nonzero_params,
-                    'effective_param_bytes': eff_bytes,
-                    'prompt_len_theta': theta,
-                    'retrieval_cost_ms': avg_latency,
-                    'original_sentence': sentence,
-                    'reconstructed_sentence': recon_text,
-                    'is_perfect': is_perfect,
-                    'semantic_similarity': sem_sim,
-                    'factual_recall': fact,
-                    'lexical_recall': lex,
-                    'success_composite': succ_comp,
-                    'semantic_threshold_used': thresh,
-                    'is_semantically_equivalent': is_sem_eq
-                })
-        return rows
 
     def run_experiment(self) -> pd.DataFrame:
         logger.info("Running quantization experiment...")
         id_sents = DataHandler.load_sentences(self.config.dataset_name, self.config.dataset_subset, self.config.test_split, max_samples=self.config.max_samples)
         ood_sents = []
-        if getattr(self.config,"ood_dataset_name",None):
-            ood_sents = DataHandler.load_sentences(self.config.ood_dataset_name, self.config.ood_dataset_subset, self.config.ood_split, max_samples=getattr(self.config,"max_samples_ood",None) or self.config.max_samples)
-            lvl = getattr(self.config,"ood_hard_level",None)
-            if lvl=="mask_trunc":
-                ood_sents = mask_and_truncate(ood_sents,getattr(self.config,"ood_hard_k",8))
-            elif lvl=="mstr":
-                ood_sents = mask_shuffle_trunc(ood_sents,getattr(self.config,"ood_hard_k",6))
+        if getattr(self.config, "ood_dataset_name", None):
+            ood_sents = DataHandler.load_sentences(self.config.ood_dataset_name, self.config.ood_dataset_subset, self.config.ood_split, max_samples=getattr(self.config, "max_samples_ood", None) or self.config.max_samples)
+            lvl = getattr(self.config, "ood_hard_level", None)
+            if lvl == "mask_trunc":
+                ood_sents = mask_and_truncate(ood_sents, getattr(self.config, "ood_hard_k", 8))
+            elif lvl == "mstr":
+                ood_sents = mask_shuffle_trunc(ood_sents, getattr(self.config, "ood_hard_k", 6))
         all_results = []
         quantized_models_dir = Path(self.config.quantized_models_dir)
         for model_dir in quantized_models_dir.iterdir():
@@ -116,13 +77,13 @@ class QuantizationExperiment(BaseExperiment):
             nonzero_params = counts["nonzero_params"]
             total_params = counts["total_params"]
             eff_bytes = counts["effective_param_bytes"]
-            sparsity = 1.0 - nonzero_params / total_params if total_params else 0.0
+            sparsity = np.where(total_params > 0, 1.0 - nonzero_params / total_params, 0.0)
             parts = model_name.split('_')
             base_model = '_'.join(parts[:-2]) if len(parts) >= 3 else model_name
-            try:bits=int(parts[-2][1:]) if len(parts)>=2 and parts[-2].startswith('b') else None
-            except Exception:bits=None
-            try:sparsity_name=int(parts[-1][1:])/100 if len(parts)>=1 and parts[-1].startswith('s') else None
-            except Exception:sparsity_name=None
+            try: bits = int(parts[-2][1:]) if len(parts) >= 2 and parts[-2].startswith('b') else None
+            except Exception: bits = None
+            try: sparsity_name = int(parts[-1][1:]) / 100 if len(parts) >= 1 and parts[-1].startswith('s') else None
+            except Exception: sparsity_name = None
             all_results += self._eval_domain(model, tokenizer, id_sents, "id", self.config.semantic_threshold, model_name, storage_cost, total_params, nonzero_params, eff_bytes, sparsity, base_model, bits, sparsity_name)
             if ood_sents:
                 all_results += self._eval_domain(model, tokenizer, ood_sents, "ood", self.config.semantic_threshold_ood, model_name, storage_cost, total_params, nonzero_params, eff_bytes, sparsity, base_model, bits, sparsity_name)

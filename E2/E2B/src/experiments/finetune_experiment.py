@@ -33,9 +33,9 @@ class FinetuneExperiment(BaseExperiment):
             tuner = ModelFineTuner(cfg.model_id, str(out_dir), self.config.training_args)
             tuner.fine_tune(self.config.dataset_name, self.config.dataset_subset)
 
-    def _eval_domain(self, model, tok, sentences, domain: str, thresh: float, model_name: str, size_bytes: int, counts):
+    def _eval_domain(self, model, tok, sentences, domain, thresh, model_name, size_bytes, counts):
         rows = []
-        sparsity = 1.0 - counts["nonzero_params"] / counts["total_params"] if counts["total_params"] else 0.0
+        sparsity = np.where(counts["total_params"] > 0, 1.0 - counts["nonzero_params"] / counts["total_params"], 0.0)
         for s in tqdm(sentences, desc=f"{model_name} {domain}"):
             for theta in self.config.theta_budgets:
                 lats = [self.reconstructor.reconstruct_sentence(model, tok, s, theta)[1] for _ in range(self.config.num_repetitions)]
@@ -43,7 +43,7 @@ class FinetuneExperiment(BaseExperiment):
                 sim = self.metrics.calculate_semantic_similarity(s, recon)
                 fact = self.metrics.calculate_factual_recall(s, recon)
                 lex = self.metrics.lexical_recall(s, recon)
-                succ_comp = 0.6*sim + 0.3*fact + 0.1*lex
+                succ_comp = 0.6*sim + 0.3*fact + 0.1*lex  # Heuristic: Weighted composite (configurable; emphasizes semantic)
                 rows.append(dict(
                     model_name=model_name,
                     eval_domain=domain,

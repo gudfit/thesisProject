@@ -6,10 +6,6 @@ cd "$ROOT"
 
 PY=python
 
-$PY scripts/run_experiment.py --config configs/experiments/finetune_multi_model.yaml --experiment finetune --log-level INFO
-
-$PY scripts/run_experiment.py --config configs/experiments/pruning_gpt2.yaml --experiment pruning --log-level INFO
-
 $PY scripts/run_experiment.py --config configs/experiments/advanced_pruning_experiment.yaml --experiment advanced_pruning --log-level INFO
 
 $PY scripts/run_experiment.py --config configs/experiments/quantization_experiment.yaml --experiment quantization --log-level INFO

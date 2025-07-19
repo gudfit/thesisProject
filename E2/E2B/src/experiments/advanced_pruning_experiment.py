@@ -89,13 +89,13 @@ class AdvancedPruningExperiment(BaseExperiment):
     def run_experiment(self) -> pd.DataFrame:
         id_sents = DataHandler.load_sentences(self.config.dataset_name, self.config.dataset_subset, self.config.test_split, max_samples=self.config.max_samples)
         ood_sents = []
-        if getattr(self.config,"ood_dataset_name",None):
-            ood_sents = DataHandler.load_sentences(self.config.ood_dataset_name, self.config.ood_dataset_subset, self.config.ood_split, max_samples=getattr(self.config,"max_samples_ood",None) or self.config.max_samples)
-            lvl = getattr(self.config,"ood_hard_level",None)
-            if lvl=="mask_trunc":
-                ood_sents = mask_and_truncate(ood_sents,getattr(self.config,"ood_hard_k",8))
-            elif lvl=="mstr":
-                ood_sents = mask_shuffle_trunc(ood_sents,getattr(self.config,"ood_hard_k",6))
+        if getattr(self.config, "ood_dataset_name", None):
+            ood_sents = DataHandler.load_sentences(self.config.ood_dataset_name, self.config.ood_dataset_subset, self.config.ood_split, max_samples=getattr(self.config, "max_samples_ood", None) or self.config.max_samples)
+            lvl = getattr(self.config, "ood_hard_level", None)
+            if lvl == "mask_trunc":
+                ood_sents = mask_and_truncate(ood_sents, getattr(self.config, "ood_hard_k", 8))
+            elif lvl == "mstr":
+                ood_sents = mask_shuffle_trunc(ood_sents, getattr(self.config, "ood_hard_k", 6))
         rows: List[Dict] = []
         device = "cuda" if torch.cuda.is_available() else "cpu"
         pruned_root = Path(self.config.pruned_models_dir)
@@ -109,7 +109,7 @@ class AdvancedPruningExperiment(BaseExperiment):
                 alt = ft_root / sid.lower()
                 ft_path = alt if alt.exists() else None
             if ft_path is None or not ft_path.exists():
-                logger.warning("Skipping %s – no matching fine-tuned weights", sid)
+                logger.warning("Skipping %s - no matching fine-tuned weights", sid)
                 continue
             for meth_dir in base_dir.iterdir():
                 if not meth_dir.is_dir():

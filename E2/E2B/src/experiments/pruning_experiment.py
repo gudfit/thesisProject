@@ -37,7 +37,7 @@ class PruningExperiment(BaseExperiment):
 
     def _eval_domain(self, model, tok, sentences, domain, thresh, label, storage, counts):
         rows = []
-        sparsity = 1.0 - counts["nonzero_params"] / counts["total_params"] if counts["total_params"] else 0.0
+        sparsity = np.where(counts["total_params"] > 0, 1.0 - counts["nonzero_params"] / counts["total_params"], 0.0)
         for sent in tqdm(sentences, desc=f"{label} {domain}"):
             for theta in self.config.theta_budgets:
                 latencies = []
@@ -48,7 +48,7 @@ class PruningExperiment(BaseExperiment):
                 sim = self.metrics.calculate_semantic_similarity(sent, recon)
                 fact = self.metrics.calculate_factual_recall(sent, recon)
                 lex = self.metrics.lexical_recall(sent, recon)
-                succ_comp = 0.6*sim + 0.3*fact + 0.1*lex
+                succ_comp = 0.6*sim + 0.3*fact + 0.1*lex  
                 rows.append(dict(
                     model_name=label,
                     eval_domain=domain,
@@ -70,6 +70,7 @@ class PruningExperiment(BaseExperiment):
                     is_semantically_equivalent=sim >= thresh,
                 ))
         return rows
+
 
     def run_experiment(self) -> pd.DataFrame:
         id_sents = DataHandler.load_sentences(self.config.dataset_name, self.config.dataset_subset, self.config.test_split, max_samples=getattr(self.config,"max_samples",1000))
