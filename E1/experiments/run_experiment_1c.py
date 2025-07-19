@@ -1,4 +1,4 @@
-# src/experiments/run_experiment_1c.py
+# experiments/run_experiment_1c.py
 """Run Experiment 1C: Effects of Pruning and Quantization on Knowledge Compression."""
 
 import os
@@ -67,7 +67,7 @@ class Experiment1CRunner:
     def run_compression_analysis(self):
         self.logger.info("Starting Experiment 1C: Model Compression Analysis")
         
-        data_loader = WikiDataLoader()
+        data_loader = WikiDataLoader(dataset_config="wikitext-103-raw-v1")
         _, test_texts = data_loader.load_data(test_size=500)
 
         self._run_and_log_baselines(test_texts)
@@ -187,7 +187,7 @@ class Experiment1CRunner:
         from datasets import load_dataset
         fidelity_conf = self.config['experiment_1c']['structural_fidelity']
         num_samples = fidelity_conf.get('test_samples', 20)
-        dataset = load_dataset('wikitext', 'wikitext-2-raw-v1', split=f'test[:{num_samples*2}]')
+        dataset = load_dataset('wikitext', 'wikitext-103-raw-v1', split=f'test[:{num_samples*2}]')
         return [item['text'] for item in dataset if len(item['text'].strip()) > 50][:num_samples]
 
     def _evaluate_structural_fidelity_pm(self, model: torch.nn.Module, model_name: str, test_texts: List[str]) -> Dict:
@@ -275,7 +275,7 @@ class Experiment1CRunner:
         from datasets import load_dataset
         bench_conf = self.config['experiment_1c']['benchmark']
         batch_size = bench_conf.get('batch_size', 8)
-        dataset = load_dataset('wikitext', 'wikitext-2-raw-v1', split=f'test[:{batch_size*2}]')
+        dataset = load_dataset('wikitext', 'wikitext-103-raw-v1', split=f'test[:{batch_size*2}]')
         test_texts = [item['text'].strip() for item in dataset if len(item['text'].strip()) > 50][:batch_size]
         
         if not test_texts:
@@ -405,8 +405,7 @@ class Experiment1CRunner:
                     throughput = computational.get('throughput_samples_per_sec', 1)
                     efficiency_score = np.clip(throughput / 200, 0, 1) # Normalize throughput
                     
-                    combined = (weights['downstream_performance'] * glue_score +
-                                weights['structural_fidelity'] * tcm_score +
+                    combined = (weights['downstream_performance'] * glue_score + weights['structural_fidelity'] * tcm_score +
                                 weights['computational_efficiency'] * efficiency_score)
                     data['score'].append(combined)
 

@@ -3,10 +3,10 @@
 
 from .base_compressor import BaseCompressor
 from .predictive_masking import PredictiveMaskingCompressor
-from .latent_space_quantization import LatentSpaceQuantizationCompressor
+from .vector_quantization import VectorQuantizationCompressor
 
 __all__ = [
     "BaseCompressor",
     "PredictiveMaskingCompressor",
-    "LatentSpaceQuantizationCompressor",
+    "VectorQuantizationCompressor",
 ]
